@@ -1,0 +1,37 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Inter', 'PingFang SC', 'Microsoft YaHei', ui-sans-serif, system-ui, sans-serif;
+  --color-background: oklch(0.97 0.01 95);
+  --color-foreground: oklch(0.2 0.01 80);
+  --color-card: oklch(0.995 0.005 90);
+  --color-border: oklch(0.88 0.01 85);
+  --color-primary: oklch(0.48 0.13 155);
+  --color-primary-foreground: oklch(0.99 0.005 90);
+  --color-muted: oklch(0.93 0.01 90);
+  --color-muted-foreground: oklch(0.48 0.015 80);
+}
+
+:root {
+  color: var(--color-foreground);
+  background: var(--color-background);
+  font-family: var(--font-sans);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  border-color: var(--color-border);
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}

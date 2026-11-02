@@ -1,0 +1,7 @@
+node_modules
+dist
+coverage
+.codegraph
+.data
+bun.lock
+backend/server/drizzle
