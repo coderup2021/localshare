@@ -1,5 +1,5 @@
 import { createPublicMessageRequestSchema } from '@localshare/contracts'
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type DragEvent, type FormEvent } from 'react'
 
 import { Button } from './components/ui/button'
 import { describeHealth } from './lib/health'
@@ -8,10 +8,34 @@ import { connectPublicRealtime } from './lib/public-realtime'
 import { usePublicChatStore } from './stores/public-chat-store'
 import { useServiceStore } from './stores/service-store'
 
+const COMPOSER_HINT_HIDDEN_KEY = 'localshare.composer-hint-hidden'
+
+function composerHintIsVisible() {
+  try {
+    return window.localStorage.getItem(COMPOSER_HINT_HIDDEN_KEY) !== '1'
+  } catch {
+    return true
+  }
+}
+
+function scrollMessageListToLatest(
+  messageList: HTMLDivElement | null,
+  behavior: ScrollBehavior = 'auto',
+) {
+  messageList?.scrollTo({
+    top: messageList.scrollHeight,
+    behavior,
+  })
+}
+
 export function App() {
   const [draft, setDraft] = useState('')
   const [draftError, setDraftError] = useState<string | null>(null)
-  const messageEndRef = useRef<HTMLDivElement>(null)
+  const [composerHintVisible, setComposerHintVisible] = useState(composerHintIsVisible)
+  const [dragActive, setDragActive] = useState(false)
+  const messageListRef = useRef<HTMLDivElement>(null)
+  const messageContentRef = useRef<HTMLDivElement>(null)
+  const stickToLatestRef = useRef(true)
   const lastMessageSeqRef = useRef(0)
 
   const health = useServiceStore((state) => state.health)
@@ -67,10 +91,36 @@ export function App() {
   useEffect(() => {
     const latestSeq = messages.at(-1)?.seq ?? 0
     if (latestSeq > lastMessageSeqRef.current) {
-      messageEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+      lastMessageSeqRef.current = latestSeq
+      stickToLatestRef.current = true
+      const frame = window.requestAnimationFrame(() => {
+        scrollMessageListToLatest(messageListRef.current)
+      })
+      return () => window.cancelAnimationFrame(frame)
     }
+
     lastMessageSeqRef.current = latestSeq
   }, [messages])
+
+  useEffect(() => {
+    const messageContent = messageContentRef.current
+    if (!messageContent) return
+
+    let frame = 0
+    const observer = new ResizeObserver(() => {
+      if (!stickToLatestRef.current) return
+      window.cancelAnimationFrame(frame)
+      frame = window.requestAnimationFrame(() => {
+        scrollMessageListToLatest(messageListRef.current)
+      })
+    })
+
+    observer.observe(messageContent)
+    return () => {
+      observer.disconnect()
+      window.cancelAnimationFrame(frame)
+    }
+  }, [])
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -96,12 +146,68 @@ export function App() {
     void sendFiles(files)
   }
 
+  const dragContainsFiles = (event: DragEvent<HTMLElement>) =>
+    Array.from(event.dataTransfer.types).includes('Files')
+
+  const handleDragEnter = (event: DragEvent<HTMLFormElement>) => {
+    if (!dragContainsFiles(event)) return
+    event.preventDefault()
+    setDragActive(true)
+  }
+
+  const handleDragOver = (event: DragEvent<HTMLFormElement>) => {
+    if (!dragContainsFiles(event)) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'copy'
+    setDragActive(true)
+  }
+
+  const handleDragLeave = (event: DragEvent<HTMLFormElement>) => {
+    const nextTarget = event.relatedTarget
+    if (nextTarget instanceof Node && event.currentTarget.contains(nextTarget)) return
+    setDragActive(false)
+  }
+
+  const handleDrop = (event: DragEvent<HTMLFormElement>) => {
+    if (!dragContainsFiles(event)) return
+    event.preventDefault()
+    setDragActive(false)
+    sendSelectedFiles(Array.from(event.dataTransfer.files))
+  }
+
+  const pauseStickingToLatest = () => {
+    stickToLatestRef.current = false
+  }
+
+  const handleMediaLoaded = () => {
+    if (stickToLatestRef.current) {
+      scrollMessageListToLatest(messageListRef.current)
+    }
+  }
+
+  const dismissComposerHint = () => {
+    setComposerHintVisible(false)
+    try {
+      window.localStorage.setItem(COMPOSER_HINT_HIDDEN_KEY, '1')
+    } catch {
+      // The preference still applies for this page when storage is unavailable.
+    }
+  }
+
   const composerDisabled = sending || uploading || loading || !visitor
+  const composerStatus =
+    draftError ??
+    chatError ??
+    (uploading
+      ? `正在发送 ${uploadFileIndex}/${uploadFileTotal} · ${uploadFileName} · ${uploadProgress}%`
+      : sending
+        ? '正在发送消息…'
+        : null)
   const isOnline = healthState === 'online'
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 py-5 sm:px-8 sm:py-8">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-5">
+    <main className="mx-auto flex h-screen w-full max-w-6xl flex-col overflow-hidden px-4 py-5 sm:px-8 sm:py-8">
+      <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border pb-5">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">
             Local network
@@ -127,8 +233,8 @@ export function App() {
         </div>
       </header>
 
-      <section className="flex flex-1 py-5 sm:py-7">
-        <div className="mx-auto flex min-h-[70vh] w-full max-w-3xl flex-col overflow-hidden rounded-[2rem] border border-border bg-card shadow-[0_24px_80px_-48px_rgba(25,45,30,0.45)]">
+      <section className="flex min-h-0 flex-1 py-5 sm:py-7">
+        <div className="mx-auto flex h-full min-h-0 w-full max-w-3xl flex-col overflow-hidden rounded-[2rem] border border-border bg-card shadow-[0_24px_80px_-48px_rgba(25,45,30,0.45)]">
           <div className="flex items-center justify-between border-b border-border px-5 py-4 sm:px-7">
             <div>
               <p className="text-xs font-medium text-primary">公开会话</p>
@@ -148,99 +254,118 @@ export function App() {
           </div>
 
           <div
-            className="flex-1 space-y-4 overflow-y-auto bg-background/40 px-4 py-6 sm:px-7"
+            ref={messageListRef}
+            aria-label="消息列表"
+            className="min-h-0 flex-1 overflow-y-auto bg-background/40 px-4 py-6 sm:px-7"
             aria-live="polite"
+            onWheel={pauseStickingToLatest}
+            onTouchMove={pauseStickingToLatest}
+            onPointerDown={pauseStickingToLatest}
           >
-            {hasMore ? (
-              <div className="flex justify-center pb-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  disabled={loadingOlder}
-                  onClick={() => void loadOlder()}
-                >
-                  {loadingOlder ? '加载中…' : '加载更早消息'}
-                </Button>
-              </div>
-            ) : null}
-            {loading ? (
-              <p className="py-10 text-center text-sm text-muted-foreground">正在载入公共频道…</p>
-            ) : messages.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-border p-8 text-center">
-                <p className="font-medium">还没有消息</p>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  发送第一条消息，局域网里的访问者都能看到。
-                </p>
-              </div>
-            ) : (
-              messages.map((message) => {
-                const ownMessage = visitor?.id === message.senderId
-                return (
-                  <article
-                    key={message.id}
-                    className={`flex ${ownMessage ? 'justify-end' : 'justify-start'}`}
+            <div ref={messageContentRef} className="space-y-4">
+              {hasMore ? (
+                <div className="flex justify-center pb-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={loadingOlder}
+                    onClick={() => void loadOlder()}
                   >
-                    <div
-                      className={`max-w-[85%] rounded-2xl px-4 py-3 ${
-                        ownMessage
-                          ? 'rounded-br-md bg-primary text-primary-foreground'
-                          : 'rounded-bl-md border border-border bg-card'
-                      }`}
+                    {loadingOlder ? '加载中…' : '加载更早消息'}
+                  </Button>
+                </div>
+              ) : null}
+              {loading ? (
+                <p className="py-10 text-center text-sm text-muted-foreground">正在载入公共频道…</p>
+              ) : messages.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-border p-8 text-center">
+                  <p className="font-medium">还没有消息</p>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    发送第一条消息，局域网里的访问者都能看到。
+                  </p>
+                </div>
+              ) : (
+                messages.map((message) => {
+                  const ownMessage = visitor?.id === message.senderId
+                  return (
+                    <article
+                      key={message.id}
+                      className={`flex ${ownMessage ? 'justify-end' : 'justify-start'}`}
                     >
                       <div
-                        className={`mb-1 flex items-center gap-2 text-xs ${
-                          ownMessage ? 'text-primary-foreground/75' : 'text-muted-foreground'
+                        className={`max-w-[85%] rounded-2xl px-4 py-3 ${
+                          ownMessage
+                            ? 'rounded-br-md bg-primary text-primary-foreground'
+                            : 'rounded-bl-md border border-border bg-card'
                         }`}
                       >
-                        <span>{message.senderName}</span>
-                        <time dateTime={message.createdAt}>{messageTime(message.createdAt)}</time>
-                      </div>
-                      {message.attachment?.kind === 'image' ? (
-                        <img
-                          src={message.attachment.url}
-                          alt={message.attachment.name}
-                          loading="lazy"
-                          className="mb-2 max-h-80 w-full rounded-xl object-contain"
-                        />
-                      ) : null}
-                      {message.attachment?.kind === 'video' ? (
-                        <video
-                          src={message.attachment.url}
-                          controls
-                          preload="metadata"
-                          className="mb-2 max-h-80 w-full rounded-xl bg-black"
-                        />
-                      ) : null}
-                      {message.attachment?.kind === 'file' ? (
-                        <a
-                          href={message.attachment.url}
-                          download={message.attachment.name}
-                          className="mb-2 flex items-center justify-between gap-4 rounded-xl border border-current/15 px-3 py-2 text-sm"
+                        <div
+                          className={`mb-1 flex items-center gap-2 text-xs ${
+                            ownMessage ? 'text-primary-foreground/75' : 'text-muted-foreground'
+                          }`}
                         >
-                          <span className="truncate">{message.attachment.name}</span>
-                          <span className="shrink-0 text-xs opacity-70">
-                            {formatBytes(message.attachment.sizeBytes)}
-                          </span>
-                        </a>
-                      ) : null}
-                      {message.text ? (
-                        <p className="whitespace-pre-wrap break-words text-sm leading-6">
-                          {message.text}
-                        </p>
-                      ) : null}
-                    </div>
-                  </article>
-                )
-              })
-            )}
-            <div ref={messageEndRef} />
+                          <span>{message.senderName}</span>
+                          <time dateTime={message.createdAt}>{messageTime(message.createdAt)}</time>
+                        </div>
+                        {message.attachment?.kind === 'image' ? (
+                          <img
+                            src={message.attachment.url}
+                            alt={message.attachment.name}
+                            loading="lazy"
+                            className="mb-2 max-h-80 w-full rounded-xl object-contain"
+                            onLoad={handleMediaLoaded}
+                          />
+                        ) : null}
+                        {message.attachment?.kind === 'video' ? (
+                          <video
+                            src={message.attachment.url}
+                            controls
+                            preload="metadata"
+                            className="mb-2 max-h-80 w-full rounded-xl bg-black"
+                            onLoadedMetadata={handleMediaLoaded}
+                          />
+                        ) : null}
+                        {message.attachment?.kind === 'file' ? (
+                          <a
+                            href={message.attachment.url}
+                            download={message.attachment.name}
+                            className="mb-2 flex items-center justify-between gap-4 rounded-xl border border-current/15 px-3 py-2 text-sm"
+                          >
+                            <span className="truncate">{message.attachment.name}</span>
+                            <span className="shrink-0 text-xs opacity-70">
+                              {formatBytes(message.attachment.sizeBytes)}
+                            </span>
+                          </a>
+                        ) : null}
+                        {message.text ? (
+                          <p className="whitespace-pre-wrap break-words text-sm leading-6">
+                            {message.text}
+                          </p>
+                        ) : null}
+                      </div>
+                    </article>
+                  )
+                })
+              )}
+            </div>
           </div>
 
           <form
-            className="border-t border-border p-4 sm:p-5"
+            className={`relative shrink-0 border-t border-border p-4 sm:p-5 ${
+              dragActive ? 'bg-primary/5' : ''
+            }`}
             onSubmit={(event) => void submit(event)}
+            onDragEnter={handleDragEnter}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
           >
+            {dragActive ? (
+              <div className="pointer-events-none absolute inset-2 z-20 flex items-center justify-center rounded-[1.75rem] border-2 border-dashed border-primary bg-card/95 text-sm font-medium text-primary shadow-lg">
+                松开鼠标即可发送文件
+              </div>
+            ) : null}
             <div className="overflow-hidden rounded-[1.75rem] border border-border bg-card shadow-[0_18px_55px_-32px_rgba(25,45,30,0.55)]">
               <div className="flex items-center gap-1 px-3 py-2 sm:px-4">
                 <input
@@ -315,7 +440,9 @@ export function App() {
               <textarea
                 id="message-input"
                 aria-label="消息内容"
-                aria-describedby="composer-status"
+                aria-describedby={
+                  composerStatus || composerHintVisible ? 'composer-hint' : undefined
+                }
                 value={draft}
                 onChange={(event) => {
                   setDraft(event.target.value)
@@ -334,37 +461,55 @@ export function App() {
                 className="min-h-32 w-full resize-none border-0 bg-transparent px-5 py-2 text-[15px] leading-7 outline-none placeholder:text-muted-foreground/80 disabled:cursor-not-allowed disabled:opacity-60 sm:px-6"
               />
 
-              <div className="border-t border-border/70 px-4 py-2.5 sm:px-5">
-                <p
-                  id="composer-status"
-                  aria-live="polite"
-                  className={`text-xs ${
-                    draftError || chatError ? 'text-red-600' : 'text-muted-foreground'
-                  }`}
-                >
-                  {draftError ??
-                    chatError ??
-                    (uploading
-                      ? `正在发送 ${uploadFileIndex}/${uploadFileTotal} · ${uploadFileName} · ${uploadProgress}%`
-                      : sending
-                        ? '正在发送消息…'
-                        : 'Enter 发送 · Shift+Enter 换行')}
-                </p>
-                {uploading ? (
-                  <div className="mt-2 h-1 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className="h-full rounded-full bg-primary transition-[width]"
-                      style={{ width: `${uploadProgress}%` }}
-                    />
+              {composerStatus || composerHintVisible ? (
+                <div className="border-t border-border/70 px-4 py-2.5 sm:px-5">
+                  <div className="flex items-center gap-3">
+                    <p
+                      id="composer-hint"
+                      aria-live="polite"
+                      className={`min-w-0 flex-1 text-xs ${
+                        draftError || chatError ? 'text-red-600' : 'text-muted-foreground'
+                      }`}
+                    >
+                      {composerStatus ?? 'Enter 发送 · Shift+Enter 换行'}
+                    </p>
+                    {composerHintVisible && !composerStatus ? (
+                      <button
+                        type="button"
+                        aria-label="隐藏输入提示"
+                        title="隐藏输入提示"
+                        className="inline-flex size-5 shrink-0 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                        onClick={dismissComposerHint}
+                      >
+                        <svg
+                          viewBox="0 0 20 20"
+                          className="size-3.5"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          aria-hidden="true"
+                        >
+                          <path d="m5 5 10 10M15 5 5 15" />
+                        </svg>
+                      </button>
+                    ) : null}
                   </div>
-                ) : null}
-              </div>
+                  {uploading ? (
+                    <div className="mt-2 h-1 overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full rounded-full bg-primary transition-[width]"
+                        style={{ width: `${uploadProgress}%` }}
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           </form>
         </div>
       </section>
 
-      <footer className="border-t border-border pt-4 text-xs text-muted-foreground">
+      <footer className="shrink-0 border-t border-border pt-4 text-xs text-muted-foreground">
         Web 入口 7777 · API 5678 · 公开消息仅保存在本地
       </footer>
     </main>

@@ -52,15 +52,31 @@ test('user message is visible to another anonymous browser', async ({ browser, p
 
   const message = `E2E public message ${Date.now()}`
   const composer = page.getByLabel('消息内容')
+  const messageList = page.getByLabel('消息列表')
+  const composerHint = page.getByText('Enter 发送 · Shift+Enter 换行', { exact: true })
   await expect(page.getByRole('button', { name: '发送', exact: true })).toHaveCount(0)
   await expect(page.getByLabel('添加文件夹')).toHaveCount(0)
+  await expect(composerHint).toBeVisible()
+  await expect(messageList).toBeVisible()
+  await expect(messageList).toHaveCSS('overflow-y', 'auto')
+  await expect(page.locator('main')).toHaveCSS('overflow', 'hidden')
   await composer.fill(message)
   await composer.press('Shift+Enter')
   await composer.type('second line')
   await expect(composer).toHaveValue(`${message}\nsecond line`)
   await expect(page.locator('article').filter({ hasText: message })).toHaveCount(0)
+  const windowScrollY = await page.evaluate(() => Number(Reflect.get(globalThis, 'scrollY')))
   await composer.press('Enter')
   await expect(page.locator('article').filter({ hasText: message })).toBeVisible()
+  await expect
+    .poll(() =>
+      messageList.evaluate((element) => {
+        const remaining = element.scrollHeight - element.clientHeight - element.scrollTop
+        return Math.abs(remaining)
+      }),
+    )
+    .toBeLessThan(3)
+  expect(await page.evaluate(() => Number(Reflect.get(globalThis, 'scrollY')))).toBe(windowScrollY)
   await expect(secondPage.locator('article').filter({ hasText: message })).toBeVisible({
     timeout: 5_000,
   })
@@ -98,6 +114,41 @@ test('user message is visible to another anonymous browser', async ({ browser, p
   await expect(secondPage.getByRole('img', { name: imageName })).toBeVisible({
     timeout: 5_000,
   })
+
+  const droppedFileName = `dropped-${Date.now()}.txt`
+  const dataTransfer = await page.evaluateHandle((name) => {
+    const DataTransferConstructor = Reflect.get(globalThis, 'DataTransfer')
+    const transfer = new DataTransferConstructor()
+    transfer.items.add(new File(['LocalShare drag and drop E2E'], name, { type: 'text/plain' }))
+    return transfer
+  }, droppedFileName)
+  const composerForm = page.locator('form')
+  await composerForm.dispatchEvent('dragenter', { dataTransfer })
+  await expect(page.getByText('松开鼠标即可发送文件')).toBeVisible()
+  await composerForm.dispatchEvent('dragover', { dataTransfer })
+  await composerForm.dispatchEvent('drop', { dataTransfer })
+  await dataTransfer.dispose()
+
+  await expect(page.locator('article').filter({ hasText: droppedFileName })).toBeVisible()
+  await expect(secondPage.locator('article').filter({ hasText: droppedFileName })).toBeVisible({
+    timeout: 5_000,
+  })
+  await expect(page.getByText('松开鼠标即可发送文件')).toHaveCount(0)
+
+  await expect(composerHint).toBeVisible()
+  await page.getByRole('button', { name: '隐藏输入提示' }).click()
+  await expect(composerHint).toHaveCount(0)
+  await page.reload()
+  await expect(page.getByRole('heading', { name: '公共频道' })).toBeVisible()
+  await expect(composerHint).toHaveCount(0)
+  expect(
+    await page.evaluate(() => {
+      const storage = Reflect.get(globalThis, 'localStorage') as {
+        getItem(key: string): string | null
+      }
+      return storage.getItem('localshare.composer-hint-hidden')
+    }),
+  ).toBe('1')
 
   expect(secondBrowserErrors).toEqual([])
   await secondContext.close()
