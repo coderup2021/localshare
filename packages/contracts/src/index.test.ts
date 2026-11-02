@@ -8,6 +8,7 @@ import {
   createPublicMessageRequestSchema,
   healthStatusSchema,
   publicMessageSchema,
+  publicRealtimeEventSchema,
 } from './index'
 
 describe('API contracts', () => {
@@ -74,6 +75,26 @@ describe('API contracts', () => {
         kind: 'text',
         text: 'hello',
         createdAt: '2026-11-02T10:00:00.000Z',
+      }).success,
+    ).toBe(true)
+  })
+
+  test('validates realtime message events', () => {
+    expect(
+      publicRealtimeEventSchema.safeParse({
+        type: 'message.created',
+        eventId: crypto.randomUUID(),
+        occurredAt: '2026-11-02T10:00:00.000Z',
+        message: {
+          id: 'message-1',
+          seq: 1,
+          senderType: 'visitor',
+          senderId: 'visitor-1',
+          senderName: '访客',
+          kind: 'text',
+          text: 'hello',
+          createdAt: '2026-11-02T10:00:00.000Z',
+        },
       }).success,
     ).toBe(true)
   })

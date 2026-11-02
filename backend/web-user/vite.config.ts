@@ -21,14 +21,6 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: apiTarget,
-        configure(proxy) {
-          proxy.on('proxyReq', (proxyRequest, request) => {
-            proxyRequest.setHeader(
-              'x-localshare-client-ip',
-              request.socket.remoteAddress ?? 'unknown',
-            )
-          })
-        },
       },
       '/ws': {
         target: apiTarget,

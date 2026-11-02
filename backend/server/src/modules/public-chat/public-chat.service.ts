@@ -36,9 +36,7 @@ function toPublicMessage(row: typeof messages.$inferSelect): PublicMessage {
 export class PublicChatService {
   constructor(private readonly client: DatabaseClient) {}
 
-  async bootstrap(
-    existingVisitorId: string | undefined,
-  ): Promise<Omit<PublicBootstrapResponse, 'canSend'>> {
+  async bootstrap(existingVisitorId: string | undefined): Promise<PublicBootstrapResponse> {
     await ensurePublicConversation(this.client)
     const now = Date.now()
 

@@ -43,16 +43,20 @@ test('user message is visible to another anonymous browser', async ({ browser, p
   await expect(page.getByRole('heading', { name: '公共频道' })).toBeVisible()
   await expect(page.getByText('本地服务已连接')).toBeVisible()
 
-  const message = `E2E public message ${Date.now()}`
-  await page.getByLabel('消息内容').fill(message)
-  await page.getByRole('button', { name: '发送' }).click()
-  await expect(page.getByText(message)).toBeVisible()
-
   const secondContext = await browser.newContext()
   const secondPage = await secondContext.newPage()
   const secondBrowserErrors = collectBrowserErrors(secondPage)
   await secondPage.goto(baseURL)
-  await expect(secondPage.getByText(message)).toBeVisible()
+  await expect(secondPage.getByRole('heading', { name: '公共频道' })).toBeVisible()
+  await expect(secondPage.getByText('实时已连接')).toBeVisible()
+
+  const message = `E2E public message ${Date.now()}`
+  await page.getByLabel('消息内容').fill(message)
+  await page.getByRole('button', { name: '发送' }).click()
+  await expect(page.locator('article').filter({ hasText: message })).toBeVisible()
+  await expect(secondPage.locator('article').filter({ hasText: message })).toBeVisible({
+    timeout: 5_000,
+  })
   expect(secondBrowserErrors).toEqual([])
   await secondContext.close()
 
@@ -89,7 +93,7 @@ test('admin logs in through /admin and reaches the API', async ({ page }) => {
   expect(browserErrors).toEqual([])
 })
 
-test('non-loopback browser is read-only', async ({ browser }) => {
+test('non-loopback browser can send public messages', async ({ browser }) => {
   const remoteURL = lanBaseURL()
   test.skip(!remoteURL, 'No non-loopback IPv4 interface is available')
   if (!remoteURL) return
@@ -100,11 +104,12 @@ test('non-loopback browser is read-only', async ({ browser }) => {
 
   await page.goto(remoteURL)
   await expect(page.getByRole('heading', { name: '公共频道' })).toBeVisible()
-  await expect(
-    page.getByText('当前为只读模式：只有通过 127.0.0.1 访问本地机时可以发送消息。'),
-  ).toBeVisible()
-  await expect(page.getByLabel('消息内容')).toBeDisabled()
-  await expect(page.getByRole('button', { name: '发送' })).toBeDisabled()
+  await expect(page.getByText('实时已连接')).toBeVisible()
+
+  const message = `LAN E2E message ${Date.now()}`
+  await page.getByLabel('消息内容').fill(message)
+  await page.getByRole('button', { name: '发送' }).click()
+  await expect(page.locator('article').filter({ hasText: message })).toBeVisible()
   expect(browserErrors).toEqual([])
 
   await context.close()

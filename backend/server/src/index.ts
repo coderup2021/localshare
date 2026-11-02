@@ -4,6 +4,8 @@ import { ensureDefaultAdmin, ensurePublicConversation } from './db/bootstrap'
 import { initializeDatabase, isDatabaseReady } from './db/client'
 import { AdminAuthService } from './modules/admin-auth/admin-auth.service'
 import { PublicChatService } from './modules/public-chat/public-chat.service'
+import { PublicChatHub } from './realtime/public-chat-hub'
+import { websocket } from 'hono/bun'
 
 const config = loadConfig()
 const database = initializeDatabase(config.dataDir)
@@ -11,16 +13,19 @@ await ensureDefaultAdmin(database)
 await ensurePublicConversation(database)
 const adminAuth = new AdminAuthService(database)
 const publicChat = new PublicChatService(database)
+const publicChatHub = new PublicChatHub()
 const app = createApp({
   isDatabaseReady: () => isDatabaseReady(database),
   adminAuth,
   publicChat,
+  publicChatHub,
 })
 
 const server = Bun.serve({
   hostname: config.apiHost,
   port: API_PORT,
   fetch: app.fetch,
+  websocket,
 })
 
 console.log(`LocalShare API listening on http://${config.apiHost}:${API_PORT}`)

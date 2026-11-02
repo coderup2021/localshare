@@ -21,20 +21,14 @@ function cookieFrom(response: Response) {
   }
 }
 
-async function bootstrapVisitor(clientAddress = '127.0.0.1') {
-  const response = await app.request('/api/v1/public/bootstrap', {
-    headers: {
-      'x-localshare-client-ip': clientAddress,
-    },
-  })
+async function bootstrapVisitor() {
+  const response = await app.request('/api/v1/public/bootstrap')
   expect(response.status).toBe(200)
   return {
     ...cookieFrom(response),
-    clientAddress,
     body: (await response.json()) as {
       visitor: { id: string; displayName: string }
       conversation: { id: string; title: string }
-      canSend: boolean
     },
   }
 }
@@ -61,7 +55,6 @@ describe('public chat', () => {
     expect(first.body.visitor.id).toBeTruthy()
     expect(first.body.visitor.displayName).toMatch(/^访客-/)
     expect(first.body.conversation.title).toBe('公共频道')
-    expect(first.body.canSend).toBe(true)
     expect(first.cookie).toContain('localshare_visitor=')
     expect(first.rawCookie).toContain('HttpOnly')
   })
@@ -71,7 +64,6 @@ describe('public chat', () => {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        'x-localshare-client-ip': '127.0.0.1',
       },
       body: JSON.stringify({
         text: 'hello',
@@ -91,7 +83,6 @@ describe('public chat', () => {
       headers: {
         cookie: first.cookie,
         'content-type': 'application/json',
-        'x-localshare-client-ip': first.clientAddress,
       },
       body: JSON.stringify({ text: '局域网你好', clientRequestId }),
     } satisfies RequestInit
@@ -108,7 +99,6 @@ describe('public chat', () => {
     const list = await app.request('/api/v1/public/messages', {
       headers: {
         cookie: second.cookie,
-        'x-localshare-client-ip': second.clientAddress,
       },
     })
     expect(list.status).toBe(200)
@@ -127,7 +117,6 @@ describe('public chat', () => {
         headers: {
           cookie: visitor.cookie,
           'content-type': 'application/json',
-          'x-localshare-client-ip': visitor.clientAddress,
         },
         body: JSON.stringify({
           text,
@@ -157,16 +146,14 @@ describe('public chat', () => {
     })
   })
 
-  test('allows non-loopback visitors to read but not send', async () => {
-    const remote = await bootstrapVisitor('192.168.1.50')
-    expect(remote.body.canSend).toBe(false)
+  test('allows any LAN visitor to send messages', async () => {
+    const remote = await bootstrapVisitor()
 
     const response = await app.request('/api/v1/public/messages', {
       method: 'POST',
       headers: {
         cookie: remote.cookie,
         'content-type': 'application/json',
-        'x-localshare-client-ip': remote.clientAddress,
       },
       body: JSON.stringify({
         text: 'remote write',
@@ -174,9 +161,10 @@ describe('public chat', () => {
       }),
     })
 
-    expect(response.status).toBe(403)
+    expect(response.status).toBe(201)
     expect(await response.json()).toMatchObject({
-      error: { code: 'PUBLIC_SEND_LOCAL_ONLY' },
+      text: 'remote write',
+      senderType: 'visitor',
     })
   })
 })

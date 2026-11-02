@@ -83,7 +83,6 @@ export type PublicConversation = z.infer<typeof publicConversationSchema>
 export const publicBootstrapResponseSchema = z.object({
   visitor: publicVisitorSchema,
   conversation: publicConversationSchema,
-  canSend: z.boolean(),
 })
 
 export type PublicBootstrapResponse = z.infer<typeof publicBootstrapResponseSchema>
@@ -115,3 +114,20 @@ export const createPublicMessageRequestSchema = z.object({
 })
 
 export type CreatePublicMessageRequest = z.infer<typeof createPublicMessageRequestSchema>
+
+export const publicRealtimeEventSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('ready'),
+    eventId: z.uuid(),
+    occurredAt: z.iso.datetime(),
+    latestSeq: z.number().int().nonnegative(),
+  }),
+  z.object({
+    type: z.literal('message.created'),
+    eventId: z.uuid(),
+    occurredAt: z.iso.datetime(),
+    message: publicMessageSchema,
+  }),
+])
+
+export type PublicRealtimeEvent = z.infer<typeof publicRealtimeEventSchema>

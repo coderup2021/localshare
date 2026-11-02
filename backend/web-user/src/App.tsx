@@ -3,7 +3,8 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 
 import { Button } from './components/ui/button'
 import { describeHealth } from './lib/health'
-import { messageTime } from './lib/public-chat'
+import { createClientRequestId, messageTime } from './lib/public-chat'
+import { connectPublicRealtime } from './lib/public-realtime'
 import { usePublicChatStore } from './stores/public-chat-store'
 import { useServiceStore } from './stores/service-store'
 
@@ -19,29 +20,43 @@ export function App() {
 
   const visitor = usePublicChatStore((state) => state.visitor)
   const conversation = usePublicChatStore((state) => state.conversation)
-  const canSend = usePublicChatStore((state) => state.canSend)
   const messages = usePublicChatStore((state) => state.messages)
   const hasMore = usePublicChatStore((state) => state.hasMore)
   const loading = usePublicChatStore((state) => state.loading)
   const loadingOlder = usePublicChatStore((state) => state.loadingOlder)
   const refreshing = usePublicChatStore((state) => state.refreshing)
   const sending = usePublicChatStore((state) => state.sending)
+  const realtimeConnected = usePublicChatStore((state) => state.realtimeConnected)
   const chatError = usePublicChatStore((state) => state.error)
   const initializeChat = usePublicChatStore((state) => state.initialize)
   const refreshChat = usePublicChatStore((state) => state.refresh)
   const loadOlder = usePublicChatStore((state) => state.loadOlder)
   const sendMessage = usePublicChatStore((state) => state.send)
+  const receiveMessage = usePublicChatStore((state) => state.receiveMessage)
+  const setRealtimeConnected = usePublicChatStore((state) => state.setRealtimeConnected)
 
   useEffect(() => {
     void checkHealth()
     void initializeChat()
 
+    const disconnectRealtime = connectPublicRealtime({
+      onMessage: receiveMessage,
+      onConnected: () => {
+        setRealtimeConnected(true)
+        void refreshChat()
+      },
+      onDisconnected: () => setRealtimeConnected(false),
+    })
+
     const timer = window.setInterval(() => {
       void refreshChat()
-    }, 3_000)
+    }, 15_000)
 
-    return () => window.clearInterval(timer)
-  }, [checkHealth, initializeChat, refreshChat])
+    return () => {
+      window.clearInterval(timer)
+      disconnectRealtime()
+    }
+  }, [checkHealth, initializeChat, receiveMessage, refreshChat, setRealtimeConnected])
 
   useEffect(() => {
     const latestSeq = messages.at(-1)?.seq ?? 0
@@ -55,7 +70,7 @@ export function App() {
     event.preventDefault()
     const parsed = createPublicMessageRequestSchema.safeParse({
       text: draft,
-      clientRequestId: crypto.randomUUID(),
+      clientRequestId: createClientRequestId(),
     })
 
     if (!parsed.success) {
@@ -85,6 +100,9 @@ export function App() {
               {visitor.displayName}
             </span>
           ) : null}
+          <span className="text-xs text-muted-foreground">
+            {realtimeConnected ? '实时已连接' : '正在连接实时服务'}
+          </span>
           <div className="flex items-center gap-2 rounded-full border border-border bg-card px-3 py-2 text-xs">
             <span
               className={`size-2 rounded-full ${isOnline ? 'bg-primary' : 'bg-amber-500'}`}
@@ -182,11 +200,6 @@ export function App() {
             {chatError || draftError ? (
               <p className="mb-3 text-xs text-red-600">{draftError ?? chatError}</p>
             ) : null}
-            {!canSend && !loading ? (
-              <p className="mb-3 text-xs text-amber-700">
-                当前为只读模式：只有通过 127.0.0.1 访问本地机时可以发送消息。
-              </p>
-            ) : null}
             <div className="flex items-end gap-3">
               <label className="sr-only" htmlFor="message-input">
                 消息内容
@@ -200,7 +213,7 @@ export function App() {
                   setDraftError(null)
                 }}
                 onKeyDown={(event) => {
-                  if (canSend && event.key === 'Enter' && !event.shiftKey) {
+                  if (event.key === 'Enter' && !event.shiftKey) {
                     event.preventDefault()
                     event.currentTarget.form?.requestSubmit()
                   }
@@ -208,14 +221,9 @@ export function App() {
                 placeholder="输入消息，Enter 发送，Shift+Enter 换行"
                 rows={2}
                 maxLength={2_000}
-                disabled={!canSend}
                 className="min-h-12 flex-1 resize-none rounded-xl border border-border bg-background px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
               />
-              <Button
-                type="submit"
-                disabled={sending || loading || !visitor || !canSend}
-                className="h-12 px-5"
-              >
+              <Button type="submit" disabled={sending || loading || !visitor} className="h-12 px-5">
                 {sending ? '发送中…' : '发送'}
               </Button>
             </div>

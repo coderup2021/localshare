@@ -16,7 +16,6 @@ import {
 type PublicChatState = {
   visitor: PublicVisitor | null
   conversation: PublicConversation | null
-  canSend: boolean
   messages: PublicMessage[]
   hasMore: boolean
   nextBeforeSeq: number | null
@@ -25,11 +24,14 @@ type PublicChatState = {
   loadingOlder: boolean
   refreshing: boolean
   sending: boolean
+  realtimeConnected: boolean
   error: string | null
   initialize: () => Promise<void>
   refresh: () => Promise<void>
   loadOlder: () => Promise<void>
   send: (request: CreatePublicMessageRequest) => Promise<boolean>
+  receiveMessage: (message: PublicMessage) => void
+  setRealtimeConnected: (connected: boolean) => void
 }
 
 function messageFromError(error: unknown) {
@@ -40,7 +42,6 @@ function messageFromError(error: unknown) {
 export const usePublicChatStore = create<PublicChatState>((set, get) => ({
   visitor: null,
   conversation: null,
-  canSend: false,
   messages: [],
   hasMore: false,
   nextBeforeSeq: null,
@@ -49,6 +50,7 @@ export const usePublicChatStore = create<PublicChatState>((set, get) => ({
   loadingOlder: false,
   refreshing: false,
   sending: false,
+  realtimeConnected: false,
   error: null,
   initialize: async () => {
     if (get().initialized || get().loading) return
@@ -60,7 +62,6 @@ export const usePublicChatStore = create<PublicChatState>((set, get) => ({
       set({
         visitor: bootstrap.visitor,
         conversation: bootstrap.conversation,
-        canSend: bootstrap.canSend,
         messages: history.messages,
         hasMore: history.hasMore,
         nextBeforeSeq: history.nextBeforeSeq,
@@ -124,7 +125,7 @@ export const usePublicChatStore = create<PublicChatState>((set, get) => ({
     }
   },
   send: async (request) => {
-    if (get().sending || !get().canSend) return false
+    if (get().sending) return false
 
     set({ sending: true, error: null })
     try {
@@ -141,4 +142,13 @@ export const usePublicChatStore = create<PublicChatState>((set, get) => ({
       return false
     }
   },
+  receiveMessage: (message) => {
+    const nextMessages = get()
+      .messages.filter((existing) => existing.id !== message.id)
+      .concat(message)
+      .sort((left, right) => left.seq - right.seq)
+
+    set({ messages: nextMessages, error: null })
+  },
+  setRealtimeConnected: (connected) => set({ realtimeConnected: connected }),
 }))
