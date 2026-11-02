@@ -185,6 +185,30 @@ test('user message is visible to another anonymous browser', async ({ browser, p
   })
   await expect(page.getByText('松开鼠标即可发送文件')).toHaveCount(0)
 
+  const allTab = page.getByRole('tab', { name: '所有' })
+  const mediaTab = page.getByRole('tab', { name: '图片与视频' })
+  const filesTab = page.getByRole('tab', { name: '文件列表' })
+  await expect(allTab).toHaveAttribute('aria-selected', 'true')
+
+  await mediaTab.click()
+  await expect(mediaTab).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByRole('img', { name: imageName })).toBeVisible()
+  await expect(page.getByRole('link', { name: new RegExp(attachmentName) })).toHaveCount(0)
+  await expect(page.getByRole('link', { name: new RegExp(droppedFileName) })).toHaveCount(0)
+
+  await filesTab.click()
+  await expect(filesTab).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByRole('link', { name: new RegExp(attachmentName) })).toBeVisible()
+  await expect(page.getByRole('link', { name: new RegExp(droppedFileName) })).toBeVisible()
+  await expect(page.getByRole('img', { name: imageName })).toHaveCount(0)
+  await expect(page.locator(`[data-message-id="${messageId}"]`)).toHaveCount(0)
+
+  await allTab.click()
+  await expect(allTab).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByRole('img', { name: imageName })).toBeVisible()
+  await expect(page.getByRole('link', { name: new RegExp(attachmentName) })).toBeVisible()
+  await expect(page.locator(`[data-message-id="${messageId}"]`)).toBeVisible()
+
   await expect(composerHint).toBeVisible()
   await page.getByRole('button', { name: '隐藏输入提示' }).click()
   await expect(composerHint).toHaveCount(0)

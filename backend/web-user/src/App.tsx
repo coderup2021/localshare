@@ -19,6 +19,13 @@ import { usePublicChatStore } from './stores/public-chat-store'
 import { useServiceStore } from './stores/service-store'
 
 const COMPOSER_HINT_HIDDEN_KEY = 'localshare.composer-hint-hidden'
+const MESSAGE_FILTERS = [
+  { id: 'all', label: '所有' },
+  { id: 'media', label: '图片与视频' },
+  { id: 'files', label: '文件列表' },
+] as const
+
+type MessageFilter = (typeof MESSAGE_FILTERS)[number]['id']
 
 function composerHintIsVisible() {
   try {
@@ -43,6 +50,7 @@ export function App() {
   const [draftError, setDraftError] = useState<string | null>(null)
   const [composerHintVisible, setComposerHintVisible] = useState(composerHintIsVisible)
   const [dragActive, setDragActive] = useState(false)
+  const [messageFilter, setMessageFilter] = useState<MessageFilter>('all')
   const [viewerImageId, setViewerImageId] = useState<string | null>(null)
   const [contextMenu, setContextMenu] = useState<{
     messageId: string
@@ -139,6 +147,14 @@ export function App() {
 
     lastMessageSeqRef.current = latestSeq
   }, [messages])
+
+  useEffect(() => {
+    stickToLatestRef.current = true
+    const frame = window.requestAnimationFrame(() => {
+      scrollMessageListToLatest(messageListRef.current)
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [messageFilter])
 
   useEffect(() => {
     const messageContent = messageContentRef.current
@@ -301,6 +317,14 @@ export function App() {
   const imageMessages = messages.filter(
     (message) => !message.recalledAt && message.attachment?.kind === 'image',
   )
+  const visibleMessages = messages.filter((message) => {
+    if (messageFilter === 'all') return true
+    if (message.recalledAt || !message.attachment) return false
+    if (messageFilter === 'media') {
+      return message.attachment.kind === 'image' || message.attachment.kind === 'video'
+    }
+    return message.attachment.kind === 'file'
+  })
   const contextMessage = contextMenu
     ? messages.find((message) => message.id === contextMenu.messageId)
     : undefined
@@ -336,26 +360,58 @@ export function App() {
 
       <section className="flex min-h-0 flex-1 py-5 sm:py-7">
         <div className="mx-auto flex h-full min-h-0 w-full max-w-3xl flex-col overflow-hidden rounded-[2rem] border border-border bg-card shadow-[0_24px_80px_-48px_rgba(25,45,30,0.45)]">
-          <div className="flex items-center justify-between border-b border-border px-5 py-4 sm:px-7">
-            <div>
-              <p className="text-xs font-medium text-primary">公开会话</p>
-              <h2 className="mt-1 text-xl font-semibold tracking-tight">
-                {conversation?.title ?? '公共频道'}
-              </h2>
+          <div className="shrink-0 border-b border-border">
+            <div className="flex items-center justify-between px-5 py-4 sm:px-7">
+              <div>
+                <p className="text-xs font-medium text-primary">公开会话</p>
+                <h2 className="mt-1 text-xl font-semibold tracking-tight">
+                  {conversation?.title ?? '公共频道'}
+                </h2>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={refreshing}
+                onClick={() => void refreshChat()}
+              >
+                {refreshing ? '刷新中…' : '刷新消息'}
+              </Button>
             </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              disabled={refreshing}
-              onClick={() => void refreshChat()}
+            <div
+              role="tablist"
+              aria-label="消息分类"
+              className="flex gap-1 overflow-x-auto px-4 sm:px-6"
             >
-              {refreshing ? '刷新中…' : '刷新消息'}
-            </Button>
+              {MESSAGE_FILTERS.map((filter) => {
+                const selected = messageFilter === filter.id
+                return (
+                  <button
+                    key={filter.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={selected}
+                    aria-controls="message-list"
+                    className={`shrink-0 border-b-2 px-3 py-2.5 text-sm transition ${
+                      selected
+                        ? 'border-primary font-medium text-primary'
+                        : 'border-transparent text-muted-foreground hover:text-foreground'
+                    }`}
+                    onClick={() => {
+                      setMessageFilter(filter.id)
+                      setContextMenu(null)
+                    }}
+                  >
+                    {filter.label}
+                  </button>
+                )
+              })}
+            </div>
           </div>
 
           <div
             ref={messageListRef}
+            id="message-list"
             aria-label="消息列表"
             className="min-h-0 flex-1 overflow-y-auto bg-background/40 px-4 py-6 sm:px-7"
             aria-live="polite"
@@ -379,15 +435,23 @@ export function App() {
               ) : null}
               {loading ? (
                 <p className="py-10 text-center text-sm text-muted-foreground">正在载入公共频道…</p>
-              ) : messages.length === 0 ? (
+              ) : visibleMessages.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-border p-8 text-center">
-                  <p className="font-medium">还没有消息</p>
+                  <p className="font-medium">
+                    {messageFilter === 'all'
+                      ? '还没有消息'
+                      : messageFilter === 'media'
+                        ? '还没有图片或视频'
+                        : '还没有文件'}
+                  </p>
                   <p className="mt-2 text-sm text-muted-foreground">
-                    发送第一条消息，局域网里的访问者都能看到。
+                    {messageFilter === 'all'
+                      ? '发送第一条消息，局域网里的访问者都能看到。'
+                      : '发送对应类型的附件后，会显示在这里。'}
                   </p>
                 </div>
               ) : (
-                messages.map((message) => {
+                visibleMessages.map((message) => {
                   const ownMessage = visitor?.id === message.senderId
                   return (
                     <article
