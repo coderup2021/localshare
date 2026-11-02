@@ -2,6 +2,7 @@
   "name": "@localshare/contracts",
   "version": "0.1.0",
   "private": true,
+  "license": "0BSD",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"

@@ -2,7 +2,7 @@
   "name": "localshare-server",
   "version": "0.1.0",
   "description": "LAN chat and file sharing service",
-  "license": "UNLICENSED",
+  "license": "0BSD",
   "type": "module",
   "bin": {
     "localshare": "bin/localshare.mjs"
@@ -10,7 +10,8 @@
   "files": [
     "bin",
     "resources",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "engines": {
     "node": ">=18"

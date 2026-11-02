@@ -2,6 +2,7 @@
   "name": "localshare",
   "version": "0.1.0",
   "private": true,
+  "license": "0BSD",
   "type": "module",
   "packageManager": "bun@1.4.4",
   "workspaces": [

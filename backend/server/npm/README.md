@@ -41,3 +41,8 @@ default password `12345678`. Change it after the first login.
 
 Data, uploads, logs, PID/lock files and instance configuration are written only
 under the directory supplied with `--data-dir`.
+
+## License
+
+LocalShare is released under the 0BSD license. You may use, modify, distribute
+and commercialize it without an attribution requirement or copyleft condition.

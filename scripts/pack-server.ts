@@ -67,6 +67,7 @@ cpSync(join(root, 'backend', 'server', 'npm', 'bin'), join(mainDir, 'bin'), {
   recursive: true,
 })
 cpSync(join(root, 'backend', 'server', 'npm', 'README.md'), join(mainDir, 'README.md'))
+cpSync(join(root, 'LICENSE'), join(mainDir, 'LICENSE'))
 writeFileSync(join(mainDir, 'package.json'), `${JSON.stringify(mainPackage, null, 2)}\n`)
 chmodSync(join(mainDir, 'bin', 'localshare.mjs'), 0o755)
 
@@ -88,15 +89,16 @@ writeFileSync(
       name: platformName,
       version,
       description: 'LocalShare Linux x64 server runtime',
-      license: 'UNLICENSED',
+      license: '0BSD',
       os: ['linux'],
       cpu: ['x64'],
-      files: ['bin/localshare-server'],
+      files: ['bin/localshare-server', 'LICENSE'],
     },
     null,
     2,
   )}\n`,
 )
+cpSync(join(root, 'LICENSE'), join(platformDir, 'LICENSE'))
 
 const platformPack = runCapture(
   ['npm', 'pack', '--pack-destination', artifactsDir],
