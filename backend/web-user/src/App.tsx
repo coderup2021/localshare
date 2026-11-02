@@ -558,7 +558,7 @@ export function App() {
                               <button
                                 type="button"
                                 aria-label={`查看图片 ${message.attachment.name}`}
-                                className="mb-2 block w-full cursor-zoom-in overflow-hidden rounded-xl border border-current/10 bg-black/5"
+                                className="group relative mb-2 block w-full cursor-zoom-in overflow-hidden rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
                                 onClick={() => setViewerImageId(message.id)}
                               >
                                 <span className="flex min-h-20 items-center justify-center">
@@ -570,7 +570,7 @@ export function App() {
                                     onLoad={handleMediaLoaded}
                                   />
                                 </span>
-                                <span className="block truncate border-t border-current/10 px-2.5 py-1.5 text-left text-[11px] opacity-70">
+                                <span className="pointer-events-none absolute inset-x-0 bottom-0 translate-y-full truncate bg-black/65 px-3 py-2 text-left text-xs text-white backdrop-blur-sm transition-transform duration-200 group-hover:translate-y-0 group-focus-visible:translate-y-0">
                                   {message.attachment.name}
                                 </span>
                               </button>
@@ -588,10 +588,23 @@ export function App() {
                               <a
                                 href={message.attachment.url}
                                 download={message.attachment.name}
-                                className="mb-2 flex items-center justify-between gap-4 rounded-xl border border-current/15 px-3 py-2 text-sm"
+                                className="mb-2 flex items-center gap-2 py-0.5 text-sm"
                               >
-                                <span className="truncate">{message.attachment.name}</span>
-                                <span className="shrink-0 text-xs opacity-70">
+                                <svg
+                                  viewBox="0 0 24 24"
+                                  className="size-5 shrink-0 opacity-75"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="1.7"
+                                  aria-hidden="true"
+                                >
+                                  <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z" />
+                                  <path d="M14 3v6h6M8 13h8M8 17h6" />
+                                </svg>
+                                <span className="min-w-0 flex-1 truncate">
+                                  {message.attachment.name}
+                                </span>
+                                <span className="shrink-0 text-xs opacity-60">
                                   {formatBytes(message.attachment.sizeBytes)}
                                 </span>
                               </a>

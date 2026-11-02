@@ -134,6 +134,9 @@ test('user message is visible to another anonymous browser', async ({ browser, p
   await expect(secondPage.getByRole('img', { name: imageName })).toBeVisible({
     timeout: 5_000,
   })
+  const firstImageButton = page.getByRole('button', { name: `查看图片 ${imageName}` })
+  await firstImageButton.hover()
+  await expect(page.getByText(imageName, { exact: true })).toBeVisible()
 
   const secondImageName = `pixel-two-${Date.now()}.png`
   await page.getByLabel('选择图片文件', { exact: true }).setInputFiles({
@@ -174,7 +177,7 @@ test('user message is visible to another anonymous browser', async ({ browser, p
     timeout: 5_000,
   })
 
-  await page.getByRole('button', { name: `查看图片 ${imageName}` }).click()
+  await firstImageButton.click()
   const imageViewer = page.getByRole('dialog', { name: '图片预览' })
   await expect(imageViewer.getByRole('img', { name: imageName })).toBeVisible()
   await imageViewer.dispatchEvent('wheel', { deltaY: -100 })
