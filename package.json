@@ -23,6 +23,7 @@
     "db:migrate": "bun run --cwd backend/server db:migrate",
     "pack:server": "bun run scripts/pack-server.ts",
     "install:local": "bun run scripts/install-local.ts",
+    "publish:npm": "bun run scripts/publish-npm.ts",
     "graph:index": "codegraph index .",
     "graph:sync": "codegraph sync .",
     "graph:status": "codegraph status ."

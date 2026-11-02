@@ -94,6 +94,16 @@ bun run install:local
 /tmp/localshare-local-current/bin/localshare start
 ```
 
+发布到官方 npm registry：
+
+```bash
+bun run publish:npm
+```
+
+命令会先检查登录、构建 tarball，然后按平台包、主包顺序发布。每个包发布前
+会单独提示输入当前 npm Authenticator OTP；若平台包已发布而主包失败，重跑时
+会自动跳过已存在的版本。
+
 当前发布物支持 Linux x64；不支持平台会明确失败。安装阶段不会启动服务或创建业务数据。
 
 ## 许可证

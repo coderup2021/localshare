@@ -143,6 +143,7 @@ bun run db:generate    # 生成 Drizzle migration
 bun run db:migrate     # 应用 migration
 bun run pack:server    # 构建并生成可检查的 npm tarball
 bun run install:local  # 构建并安装到隔离的临时 npm 全局目录
+bun run publish:npm    # 构建、逐包提示 OTP 并发布到官方 npm registry
 ```
 
 每个 workspace 的准确命令以其 `package.json` 为准；新增或改变脚本时同步本文件和 README。
