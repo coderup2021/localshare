@@ -81,6 +81,7 @@ export const messages = sqliteTable(
     }),
     createdAt: integer('created_at', { mode: 'number' }).notNull(),
     deletedAt: integer('deleted_at', { mode: 'number' }),
+    recalledAt: integer('recalled_at', { mode: 'number' }),
   },
   (table) => [
     uniqueIndex('messages_conversation_seq_unique').on(table.conversationId, table.seq),

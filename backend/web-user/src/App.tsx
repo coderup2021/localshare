@@ -1,7 +1,17 @@
-import { createPublicMessageRequestSchema } from '@localshare/contracts'
-import { useEffect, useRef, useState, type DragEvent, type FormEvent } from 'react'
+import { createPublicMessageRequestSchema, type PublicMessage } from '@localshare/contracts'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type DragEvent,
+  type FormEvent,
+  type MouseEvent as ReactMouseEvent,
+} from 'react'
 
+import { ImageLightbox } from './components/chat/image-lightbox'
+import { MessageContextMenu } from './components/chat/message-context-menu'
 import { Button } from './components/ui/button'
+import { copyImage, copyText } from './lib/clipboard'
 import { describeHealth } from './lib/health'
 import { createClientRequestId, formatBytes, messageTime } from './lib/public-chat'
 import { connectPublicRealtime } from './lib/public-realtime'
@@ -33,6 +43,14 @@ export function App() {
   const [draftError, setDraftError] = useState<string | null>(null)
   const [composerHintVisible, setComposerHintVisible] = useState(composerHintIsVisible)
   const [dragActive, setDragActive] = useState(false)
+  const [viewerImageId, setViewerImageId] = useState<string | null>(null)
+  const [contextMenu, setContextMenu] = useState<{
+    messageId: string
+    x: number
+    y: number
+  } | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  const noticeTimerRef = useRef<number | null>(null)
   const messageListRef = useRef<HTMLDivElement>(null)
   const messageContentRef = useRef<HTMLDivElement>(null)
   const stickToLatestRef = useRef(true)
@@ -55,6 +73,7 @@ export function App() {
   const uploadFileIndex = usePublicChatStore((state) => state.uploadFileIndex)
   const uploadFileTotal = usePublicChatStore((state) => state.uploadFileTotal)
   const uploadFileName = usePublicChatStore((state) => state.uploadFileName)
+  const recallingMessageId = usePublicChatStore((state) => state.recallingMessageId)
   const realtimeConnected = usePublicChatStore((state) => state.realtimeConnected)
   const chatError = usePublicChatStore((state) => state.error)
   const initializeChat = usePublicChatStore((state) => state.initialize)
@@ -62,7 +81,9 @@ export function App() {
   const loadOlder = usePublicChatStore((state) => state.loadOlder)
   const sendMessage = usePublicChatStore((state) => state.send)
   const sendFiles = usePublicChatStore((state) => state.sendFiles)
+  const recallMessage = usePublicChatStore((state) => state.recall)
   const receiveMessage = usePublicChatStore((state) => state.receiveMessage)
+  const receiveMessageRecalled = usePublicChatStore((state) => state.receiveMessageRecalled)
   const setRealtimeConnected = usePublicChatStore((state) => state.setRealtimeConnected)
 
   useEffect(() => {
@@ -71,6 +92,7 @@ export function App() {
 
     const disconnectRealtime = connectPublicRealtime({
       onMessage: receiveMessage,
+      onMessageRecalled: receiveMessageRecalled,
       onConnected: () => {
         setRealtimeConnected(true)
         void refreshChat()
@@ -86,7 +108,23 @@ export function App() {
       window.clearInterval(timer)
       disconnectRealtime()
     }
-  }, [checkHealth, initializeChat, receiveMessage, refreshChat, setRealtimeConnected])
+  }, [
+    checkHealth,
+    initializeChat,
+    receiveMessage,
+    receiveMessageRecalled,
+    refreshChat,
+    setRealtimeConnected,
+  ])
+
+  useEffect(
+    () => () => {
+      if (noticeTimerRef.current !== null) {
+        window.clearTimeout(noticeTimerRef.current)
+      }
+    },
+    [],
+  )
 
   useEffect(() => {
     const latestSeq = messages.at(-1)?.seq ?? 0
@@ -194,6 +232,63 @@ export function App() {
     }
   }
 
+  const showNotice = (message: string) => {
+    setNotice(message)
+    if (noticeTimerRef.current !== null) {
+      window.clearTimeout(noticeTimerRef.current)
+    }
+    noticeTimerRef.current = window.setTimeout(() => {
+      setNotice(null)
+      noticeTimerRef.current = null
+    }, 2_000)
+  }
+
+  const handleCopyMessageText = async (message: PublicMessage) => {
+    try {
+      await copyText(message.text)
+      showNotice('文字已复制')
+    } catch (error) {
+      showNotice(error instanceof Error ? error.message : '复制失败')
+    }
+  }
+
+  const handleCopyMessageImage = async (message: PublicMessage) => {
+    if (!message.attachment) return
+
+    try {
+      const copied = await copyImage(message.attachment.url)
+      showNotice(copied === 'image' ? '图片已复制' : '已复制图片地址')
+    } catch (error) {
+      showNotice(error instanceof Error ? error.message : '复制图片失败')
+    }
+  }
+
+  const handleRecallMessage = async (message: PublicMessage) => {
+    const recalled = await recallMessage(message.id)
+    if (!recalled) return
+
+    if (viewerImageId === message.id) setViewerImageId(null)
+    showNotice('消息已撤回')
+  }
+
+  const handleMessageContextMenu = (
+    event: ReactMouseEvent<HTMLElement>,
+    message: PublicMessage,
+  ) => {
+    if (message.recalledAt) return
+
+    const ownMessage = visitor?.id === message.senderId
+    const canCopy = message.text.length > 0 || message.attachment?.kind === 'image'
+    if (!ownMessage && !canCopy) return
+
+    event.preventDefault()
+    setContextMenu({
+      messageId: message.id,
+      x: event.clientX,
+      y: event.clientY,
+    })
+  }
+
   const composerDisabled = sending || uploading || loading || !visitor
   const composerStatus =
     draftError ??
@@ -203,6 +298,12 @@ export function App() {
       : sending
         ? '正在发送消息…'
         : null)
+  const imageMessages = messages.filter(
+    (message) => !message.recalledAt && message.attachment?.kind === 'image',
+  )
+  const contextMessage = contextMenu
+    ? messages.find((message) => message.id === contextMenu.messageId)
+    : undefined
   const isOnline = healthState === 'online'
 
   return (
@@ -291,58 +392,79 @@ export function App() {
                   return (
                     <article
                       key={message.id}
+                      data-message-id={message.id}
                       className={`flex ${ownMessage ? 'justify-end' : 'justify-start'}`}
+                      onContextMenu={(event) => handleMessageContextMenu(event, message)}
                     >
                       <div
                         className={`max-w-[85%] rounded-2xl px-4 py-3 ${
-                          ownMessage
-                            ? 'rounded-br-md bg-primary text-primary-foreground'
-                            : 'rounded-bl-md border border-border bg-card'
+                          message.recalledAt
+                            ? 'rounded-b-md border border-border bg-muted text-muted-foreground'
+                            : ownMessage
+                              ? 'rounded-br-md bg-primary text-primary-foreground'
+                              : 'rounded-bl-md border border-border bg-card'
                         }`}
                       >
                         <div
                           className={`mb-1 flex items-center gap-2 text-xs ${
-                            ownMessage ? 'text-primary-foreground/75' : 'text-muted-foreground'
+                            ownMessage && !message.recalledAt
+                              ? 'text-primary-foreground/75'
+                              : 'text-muted-foreground'
                           }`}
                         >
                           <span>{message.senderName}</span>
                           <time dateTime={message.createdAt}>{messageTime(message.createdAt)}</time>
                         </div>
-                        {message.attachment?.kind === 'image' ? (
-                          <img
-                            src={message.attachment.url}
-                            alt={message.attachment.name}
-                            loading="lazy"
-                            className="mb-2 max-h-80 w-full rounded-xl object-contain"
-                            onLoad={handleMediaLoaded}
-                          />
-                        ) : null}
-                        {message.attachment?.kind === 'video' ? (
-                          <video
-                            src={message.attachment.url}
-                            controls
-                            preload="metadata"
-                            className="mb-2 max-h-80 w-full rounded-xl bg-black"
-                            onLoadedMetadata={handleMediaLoaded}
-                          />
-                        ) : null}
-                        {message.attachment?.kind === 'file' ? (
-                          <a
-                            href={message.attachment.url}
-                            download={message.attachment.name}
-                            className="mb-2 flex items-center justify-between gap-4 rounded-xl border border-current/15 px-3 py-2 text-sm"
-                          >
-                            <span className="truncate">{message.attachment.name}</span>
-                            <span className="shrink-0 text-xs opacity-70">
-                              {formatBytes(message.attachment.sizeBytes)}
-                            </span>
-                          </a>
-                        ) : null}
-                        {message.text ? (
-                          <p className="whitespace-pre-wrap break-words text-sm leading-6">
-                            {message.text}
+                        {message.recalledAt ? (
+                          <p className="text-sm italic">
+                            {ownMessage ? '你撤回了一条消息' : '消息已撤回'}
                           </p>
-                        ) : null}
+                        ) : (
+                          <>
+                            {message.attachment?.kind === 'image' ? (
+                              <button
+                                type="button"
+                                aria-label={`查看图片 ${message.attachment.name}`}
+                                className="mb-2 block cursor-zoom-in overflow-hidden rounded-xl"
+                                onClick={() => setViewerImageId(message.id)}
+                              >
+                                <img
+                                  src={message.attachment.url}
+                                  alt={message.attachment.name}
+                                  loading="lazy"
+                                  className="max-h-80 w-full object-contain"
+                                  onLoad={handleMediaLoaded}
+                                />
+                              </button>
+                            ) : null}
+                            {message.attachment?.kind === 'video' ? (
+                              <video
+                                src={message.attachment.url}
+                                controls
+                                preload="metadata"
+                                className="mb-2 max-h-80 w-full rounded-xl bg-black"
+                                onLoadedMetadata={handleMediaLoaded}
+                              />
+                            ) : null}
+                            {message.attachment?.kind === 'file' ? (
+                              <a
+                                href={message.attachment.url}
+                                download={message.attachment.name}
+                                className="mb-2 flex items-center justify-between gap-4 rounded-xl border border-current/15 px-3 py-2 text-sm"
+                              >
+                                <span className="truncate">{message.attachment.name}</span>
+                                <span className="shrink-0 text-xs opacity-70">
+                                  {formatBytes(message.attachment.sizeBytes)}
+                                </span>
+                              </a>
+                            ) : null}
+                            {message.text ? (
+                              <p className="whitespace-pre-wrap break-words text-sm leading-6">
+                                {message.text}
+                              </p>
+                            ) : null}
+                          </>
+                        )}
                       </div>
                     </article>
                   )
@@ -512,6 +634,39 @@ export function App() {
       <footer className="shrink-0 border-t border-border pt-4 text-xs text-muted-foreground">
         Web 入口 7777 · API 5678 · 公开消息仅保存在本地
       </footer>
+
+      {contextMenu && contextMessage && !contextMessage.recalledAt ? (
+        <MessageContextMenu
+          message={contextMessage}
+          ownMessage={visitor?.id === contextMessage.senderId}
+          x={contextMenu.x}
+          y={contextMenu.y}
+          recalling={recallingMessageId === contextMessage.id}
+          onClose={() => setContextMenu(null)}
+          onCopyText={() => void handleCopyMessageText(contextMessage)}
+          onCopyImage={() => void handleCopyMessageImage(contextMessage)}
+          onRecall={() => void handleRecallMessage(contextMessage)}
+        />
+      ) : null}
+
+      {viewerImageId ? (
+        <ImageLightbox
+          key={viewerImageId}
+          activeImageId={viewerImageId}
+          images={imageMessages}
+          onChange={setViewerImageId}
+          onClose={() => setViewerImageId(null)}
+        />
+      ) : null}
+
+      {notice ? (
+        <div
+          role="status"
+          className="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-full bg-foreground px-4 py-2 text-xs font-medium text-background shadow-lg"
+        >
+          {notice}
+        </div>
+      ) : null}
     </main>
   )
 }

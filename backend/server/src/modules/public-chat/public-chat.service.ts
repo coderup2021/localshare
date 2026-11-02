@@ -5,7 +5,7 @@ import {
   type PublicMessage,
   type PublicMessageListResponse,
 } from '@localshare/contracts'
-import { and, desc, eq, lt } from 'drizzle-orm'
+import { and, desc, eq, isNull, lt } from 'drizzle-orm'
 
 import { ensurePublicConversation } from '../../db/bootstrap'
 import type { DatabaseClient } from '../../db/client'
@@ -25,6 +25,8 @@ function toPublicMessage(
   row: typeof messages.$inferSelect,
   attachment?: ReturnType<AttachmentService['toPublicAttachment']>,
 ): PublicMessage {
+  const recalledAt = row.recalledAt ? new Date(row.recalledAt).toISOString() : undefined
+
   return {
     id: row.id,
     seq: row.seq,
@@ -32,9 +34,10 @@ function toPublicMessage(
     senderId: row.senderId,
     senderName: row.senderName,
     kind: row.kind === 'image' || row.kind === 'video' || row.kind === 'file' ? row.kind : 'text',
-    text: row.text,
-    ...(attachment ? { attachment } : {}),
+    text: recalledAt ? '' : row.text,
+    ...(!recalledAt && attachment ? { attachment } : {}),
     createdAt: new Date(row.createdAt).toISOString(),
+    ...(recalledAt ? { recalledAt } : {}),
   }
 }
 
@@ -102,9 +105,11 @@ export class PublicChatService {
     limit: number,
   ): Promise<PublicMessageListResponse> {
     const conversation = await this.getPublicConversation()
-    const conditions = beforeSeq
-      ? and(eq(messages.conversationId, conversation.id), lt(messages.seq, beforeSeq))
-      : eq(messages.conversationId, conversation.id)
+    const conditions = and(
+      eq(messages.conversationId, conversation.id),
+      isNull(messages.deletedAt),
+      ...(beforeSeq ? [lt(messages.seq, beforeSeq)] : []),
+    )
 
     const rows = await this.client.db
       .select()
@@ -116,6 +121,7 @@ export class PublicChatService {
     const hasMore = rows.length > limit
     const page = rows.slice(0, limit).reverse()
     const attachmentIds = page
+      .filter((row) => !row.recalledAt)
       .map((row) => row.attachmentId)
       .filter((id): id is string => Boolean(id))
     const attachmentMap = this.attachments
@@ -224,6 +230,7 @@ export class PublicChatService {
         attachmentId: attachment?.id ?? null,
         createdAt: now,
         deletedAt: null,
+        recalledAt: null,
       }
 
       await transaction
@@ -254,6 +261,59 @@ export class PublicChatService {
       ),
       created: true,
     }
+  }
+
+  async recallMessage(
+    visitorId: string,
+    messageId: string,
+  ): Promise<{ message: PublicMessage; recalled: boolean }> {
+    const conversation = await this.getPublicConversation()
+    const row = await this.client.db
+      .select()
+      .from(messages)
+      .where(
+        and(
+          eq(messages.id, messageId),
+          eq(messages.conversationId, conversation.id),
+          isNull(messages.deletedAt),
+        ),
+      )
+      .limit(1)
+      .then((rows) => rows[0])
+
+    if (!row) {
+      throw new HttpError('MESSAGE_NOT_FOUND', 404, 'Message not found')
+    }
+    if (row.senderType !== 'visitor' || row.senderId !== visitorId) {
+      throw new HttpError('MESSAGE_NOT_OWNED', 403, 'Only the sender can recall this message')
+    }
+    if (row.recalledAt) {
+      return { message: toPublicMessage(row), recalled: false }
+    }
+
+    const recalledAt = Date.now()
+    const updated = await this.client.db
+      .update(messages)
+      .set({ recalledAt })
+      .where(and(eq(messages.id, messageId), isNull(messages.recalledAt)))
+      .returning()
+      .then((rows) => rows[0])
+
+    if (!updated) {
+      const current = await this.client.db
+        .select()
+        .from(messages)
+        .where(eq(messages.id, messageId))
+        .limit(1)
+        .then((rows) => rows[0])
+
+      if (!current) {
+        throw new HttpError('MESSAGE_NOT_FOUND', 404, 'Message not found')
+      }
+      return { message: toPublicMessage(current), recalled: false }
+    }
+
+    return { message: toPublicMessage(updated), recalled: true }
   }
 
   private async getPublicConversation() {

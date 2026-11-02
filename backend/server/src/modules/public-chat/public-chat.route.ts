@@ -22,6 +22,7 @@ const messageQuerySchema = z.object({
   beforeSeq: z.coerce.number().int().positive().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
 })
+const messageIdSchema = z.uuid()
 
 export function createPublicChatRoutes(
   service: PublicChatService,
@@ -162,6 +163,25 @@ export function createPublicChatRoutes(
       hub?.publish(result.message)
     }
     return context.json(publicMessageSchema.parse(result.message), result.created ? 201 : 200)
+  })
+
+  routes.delete('/messages/:messageId', async (context) => {
+    const parsed = messageIdSchema.safeParse(context.req.param('messageId'))
+    if (!parsed.success) {
+      throw new HttpError('INVALID_REQUEST', 400, 'Invalid message identifier')
+    }
+
+    const visitorId = getCookie(context, VISITOR_COOKIE)
+    if (!visitorId) {
+      throw new HttpError('VISITOR_REQUIRED', 401, 'Refresh the public channel before recalling')
+    }
+
+    const result = await service.recallMessage(visitorId, parsed.data)
+    if (result.recalled) {
+      hub?.publishRecall(result.message)
+    }
+
+    return context.json(publicMessageSchema.parse(result.message))
   })
 
   return routes

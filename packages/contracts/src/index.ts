@@ -106,6 +106,7 @@ export const publicMessageSchema = z.object({
     })
     .optional(),
   createdAt: z.iso.datetime(),
+  recalledAt: z.iso.datetime().optional(),
 })
 
 export type PublicMessage = z.infer<typeof publicMessageSchema>
@@ -156,6 +157,12 @@ export const publicRealtimeEventSchema = z.discriminatedUnion('type', [
   }),
   z.object({
     type: z.literal('message.created'),
+    eventId: z.uuid(),
+    occurredAt: z.iso.datetime(),
+    message: publicMessageSchema,
+  }),
+  z.object({
+    type: z.literal('message.recalled'),
     eventId: z.uuid(),
     occurredAt: z.iso.datetime(),
     message: publicMessageSchema,

@@ -1,10 +1,10 @@
 import { mkdirSync, rmSync } from 'node:fs'
 import { basename, extname, join, resolve } from 'node:path'
 import type { PublicAttachment } from '@localshare/contracts'
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray, isNull } from 'drizzle-orm'
 
 import type { DatabaseClient } from '../../db/client'
-import { anonymousVisitors, attachments } from '../../db/schema'
+import { anonymousVisitors, attachments, messages } from '../../db/schema'
 import { HttpError } from '../../shared/http-error'
 
 export const MAX_ATTACHMENT_BYTES = 100 * 1024 * 1024
@@ -139,20 +139,28 @@ export class AttachmentService {
   }
 
   async attachedForDownload(attachmentId: string) {
-    const row = await this.client.db
+    const result = await this.client.db
       .select()
       .from(attachments)
-      .where(and(eq(attachments.id, attachmentId), eq(attachments.status, 'attached')))
+      .innerJoin(messages, eq(messages.attachmentId, attachments.id))
+      .where(
+        and(
+          eq(attachments.id, attachmentId),
+          eq(attachments.status, 'attached'),
+          isNull(messages.deletedAt),
+          isNull(messages.recalledAt),
+        ),
+      )
       .limit(1)
       .then((rows) => rows[0])
 
-    if (!row) {
+    if (!result) {
       throw new HttpError('ATTACHMENT_NOT_FOUND', 404, 'Attachment not found')
     }
 
     return {
-      row,
-      path: this.resolveStoragePath(row.storageKey),
+      row: result.attachments,
+      path: this.resolveStoragePath(result.attachments.storageKey),
     }
   }
 

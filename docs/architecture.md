@@ -132,12 +132,13 @@ user-web 不做登录、注册和账户管理。所有打开 user-web 的访问�
 
 建议在首次访问时通过轻量接口建立匿名身份：
 
-| 方法   | 路径                              | 说明                                                        |
-| ------ | --------------------------------- | ----------------------------------------------------------- |
-| `GET`  | `/api/v1/public/bootstrap`        | 设置匿名访客 Cookie，返回频道信息、当前访客短标识和初始游标 |
-| `GET`  | `/api/v1/public/messages?cursor=` | 游标分页读取 public 历史                                    |
-| `POST` | `/api/v1/public/messages`         | 幂等发送 public 消息                                        |
-| `POST` | `/api/v1/public/read`             | 更新当前匿名访客的已读位置                                  |
+| 方法     | 路径                              | 说明                                                        |
+| -------- | --------------------------------- | ----------------------------------------------------------- |
+| `GET`    | `/api/v1/public/bootstrap`        | 设置匿名访客 Cookie，返回频道信息、当前访客短标识和初始游标 |
+| `GET`    | `/api/v1/public/messages?cursor=` | 游标分页读取 public 历史                                    |
+| `POST`   | `/api/v1/public/messages`         | 幂等发送 public 消息                                        |
+| `DELETE` | `/api/v1/public/messages/:id`     | 匿名访客撤回自己发送的消息                                  |
+| `POST`   | `/api/v1/public/read`             | 更新当前匿名访客的已读位置                                  |
 
 匿名访客 Cookie 不是管理员认证 Cookie，两者名称、签名/校验和权限必须完全分开。
 
@@ -152,6 +153,8 @@ user-web 不做登录、注册和账户管理。所有打开 user-web 的访问�
 5. 客户端用 HTTP 响应或 WebSocket 事件合并同一消息，按服务端 ID 去重。
 
 这个路径让超时重试、网络断开和 WebSocket 短暂不可用都不会产生重复或丢失消息。WebSocket 不作为唯一发送入口。
+
+撤回同样通过 HTTP 写入。服务端只允许匿名访客撤回 `senderId` 与当前访客 Cookie 一致的消息，写入 `recalledAt` 后广播 `message.recalled`；历史接口继续返回有序的撤回占位消息，但不再返回原文字或附件。
 
 消息内容类型建议：
 
@@ -190,6 +193,7 @@ user-web 不做登录、注册和账户管理。所有打开 user-web 的访问�
 
 - `ready`：连接建立成功，返回访客/管理员身份、心跳参数和当前最新 seq。
 - `message.created`
+- `message.recalled`：发送者撤回消息后广播，payload 为隐藏原文和附件后的消息占位对象。
 - `message.deleted`：管理员软删除消息后广播。
 - `read.updated`：可选的已读位置变化统计。
 - `admin.session.revoked`：仅发送给对应的管理员连接。
@@ -228,7 +232,7 @@ user-web 不做登录、注册和账户管理。所有打开 user-web 的访问�
 - 限制单文件大小、视频大小和请求频率，限制值来自环境配置。
 - MIME 与扩展名只作为初筛；危险类型强制下载。
 - 存储键由服务端生成，磁盘路径必须解析后留在附件根目录内。
-- 已关联到 public 消息的附件对所有人可下载；未关联附件只允许其上传访客读取，管理员附件列表除外。
+- 已关联且未撤回、未删除的 public 消息附件对所有人可下载；撤回或删除后下载接口返回不存在。
 - 下载接口不能允许通过客户端文件名或任意路径直接读取磁盘。
 - 视频和音频支持 HTTP `Range`，便于浏览器拖动播放。
 - 孤立附件有清理策略；被删除消息引用的附件是否立即删除需单独决策。
@@ -253,6 +257,7 @@ user-web 不做登录、注册和账户管理。所有打开 user-web 的访问�
 - `admin_account.username = 'localShare'`，唯一且不可通过普通 API 改用户名。
 - `conversations.type = 'public'`，一期只存在一行 public 记录。
 - 消息保存 `sender_type`（visitor/admin）、`sender_id` 和发送时的 `sender_name_snapshot`。
+- 消息通过 `recalled_at` 保存用户撤回时间；撤回是软状态，不破坏 seq、分页或幂等键。
 - 消息幂等键按发送者唯一，匿名访客和 admin 使用各自身份空间。
 - 所有外键声明并启用 SQLite `foreign_keys`。
 - 启用 WAL、合理的 `busy_timeout`，所有多表写入使用事务。

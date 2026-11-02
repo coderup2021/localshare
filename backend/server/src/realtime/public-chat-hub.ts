@@ -31,4 +31,17 @@ export class PublicChatHub {
       listener(event)
     }
   }
+
+  publishRecall(message: PublicMessage) {
+    const event: PublicRealtimeEvent = {
+      type: 'message.recalled',
+      eventId: crypto.randomUUID(),
+      occurredAt: new Date().toISOString(),
+      message,
+    }
+
+    for (const listener of this.listeners) {
+      listener(event)
+    }
+  }
 }

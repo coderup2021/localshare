@@ -37,6 +37,9 @@ function collectBrowserErrors(page: Page) {
 
 test('user message is visible to another anonymous browser', async ({ browser, page, request }) => {
   const browserErrors = collectBrowserErrors(page)
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write'], {
+    origin: new URL(baseURL).origin,
+  })
 
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'LocalShare' })).toBeVisible()
@@ -80,6 +83,23 @@ test('user message is visible to another anonymous browser', async ({ browser, p
   await expect(secondPage.locator('article').filter({ hasText: message })).toBeVisible({
     timeout: 5_000,
   })
+  const textArticle = page.locator('article').filter({ hasText: message })
+  const messageId = await textArticle.getAttribute('data-message-id')
+  expect(messageId).toBeTruthy()
+
+  await textArticle.click({ button: 'right' })
+  const messageMenu = page.getByRole('menu', { name: '消息操作' })
+  await expect(messageMenu.getByRole('menuitem', { name: '复制文字' })).toBeVisible()
+  await expect(messageMenu.getByRole('menuitem', { name: '撤回消息' })).toBeVisible()
+  await messageMenu.getByRole('menuitem', { name: '复制文字' }).click()
+  await expect(page.getByRole('status')).toHaveText('文字已复制')
+
+  await page.locator(`[data-message-id="${messageId}"]`).click({ button: 'right' })
+  await page.getByRole('menuitem', { name: '撤回消息' }).click()
+  await expect(page.locator(`[data-message-id="${messageId}"]`)).toContainText('你撤回了一条消息')
+  await expect(secondPage.locator(`[data-message-id="${messageId}"]`)).toContainText('消息已撤回', {
+    timeout: 5_000,
+  })
 
   const attachmentName = `e2e-${Date.now()}.txt`
   await page.getByLabel('选择文件', { exact: true }).setInputFiles({
@@ -114,6 +134,36 @@ test('user message is visible to another anonymous browser', async ({ browser, p
   await expect(secondPage.getByRole('img', { name: imageName })).toBeVisible({
     timeout: 5_000,
   })
+
+  const secondImageName = `pixel-two-${Date.now()}.png`
+  await page.getByLabel('选择图片文件', { exact: true }).setInputFiles({
+    name: secondImageName,
+    mimeType: 'image/png',
+    buffer: Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2nH0AAAAASUVORK5CYII=',
+      'base64',
+    ),
+  })
+  await expect(page.getByRole('img', { name: secondImageName })).toBeVisible()
+
+  await page.getByRole('button', { name: `查看图片 ${imageName}` }).click()
+  const imageViewer = page.getByRole('dialog', { name: '图片预览' })
+  await expect(imageViewer.getByRole('img', { name: imageName })).toBeVisible()
+  await imageViewer.dispatchEvent('wheel', { deltaY: -100 })
+  await expect(imageViewer.getByRole('button', { name: '重置图片缩放' })).toHaveText('115%')
+  await imageViewer.getByRole('button', { name: '下一张图片' }).click()
+  await expect(imageViewer.getByRole('img', { name: secondImageName })).toBeVisible()
+  await imageViewer.getByRole('button', { name: '上一张图片' }).click()
+  await expect(imageViewer.getByRole('img', { name: imageName })).toBeVisible()
+  await imageViewer.getByRole('button', { name: '关闭图片预览' }).click()
+
+  const imageArticle = page
+    .locator('article')
+    .filter({ has: page.getByRole('img', { name: imageName }) })
+  await imageArticle.click({ button: 'right' })
+  await expect(messageMenu.getByRole('menuitem', { name: '复制图片' })).toBeVisible()
+  await messageMenu.getByRole('menuitem', { name: '复制图片' }).click()
+  await expect(page.getByRole('status')).toHaveText(/图片已复制|已复制图片地址/)
 
   const droppedFileName = `dropped-${Date.now()}.txt`
   const dataTransfer = await page.evaluateHandle((name) => {

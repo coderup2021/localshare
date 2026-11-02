@@ -208,7 +208,13 @@ describe('public chat', () => {
       }),
     })
     expect(sent.status).toBe(201)
-    expect(await sent.json()).toMatchObject({
+    const sentMessage = (await sent.json()) as {
+      id: string
+      kind: string
+      text: string
+      attachment: { id: string; name: string }
+    }
+    expect(sentMessage).toMatchObject({
       kind: 'file',
       text: '附件说明',
       attachment: {
@@ -228,6 +234,72 @@ describe('public chat', () => {
     expect(ranged.status).toBe(206)
     expect(ranged.headers.get('content-range')).toBe('bytes 2-5/10')
     expect(await ranged.text()).toBe('2345')
+
+    const recalled = await app.request(`/api/v1/public/messages/${sentMessage.id}`, {
+      method: 'DELETE',
+      headers: { cookie: visitor.cookie },
+    })
+    expect(recalled.status).toBe(200)
+    expect(await recalled.json()).toMatchObject({
+      id: sentMessage.id,
+      text: '',
+      recalledAt: expect.any(String),
+    })
+
+    const hiddenAttachment = await app.request(attachment.url)
+    expect(hiddenAttachment.status).toBe(404)
+  })
+
+  test('recalls messages only for their sender and hides recalled content', async () => {
+    const owner = await bootstrapVisitor()
+    const other = await bootstrapVisitor()
+    const sent = await app.request('/api/v1/public/messages', {
+      method: 'POST',
+      headers: {
+        cookie: owner.cookie,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        text: '这条消息将被撤回',
+        clientRequestId: crypto.randomUUID(),
+      }),
+    })
+    expect(sent.status).toBe(201)
+    const message = (await sent.json()) as { id: string }
+
+    const otherRecall = await app.request(`/api/v1/public/messages/${message.id}`, {
+      method: 'DELETE',
+      headers: { cookie: other.cookie },
+    })
+    expect(otherRecall.status).toBe(403)
+
+    const ownRecall = await app.request(`/api/v1/public/messages/${message.id}`, {
+      method: 'DELETE',
+      headers: { cookie: owner.cookie },
+    })
+    expect(ownRecall.status).toBe(200)
+    expect(await ownRecall.json()).toMatchObject({
+      id: message.id,
+      text: '',
+      recalledAt: expect.any(String),
+    })
+
+    const repeatedRecall = await app.request(`/api/v1/public/messages/${message.id}`, {
+      method: 'DELETE',
+      headers: { cookie: owner.cookie },
+    })
+    expect(repeatedRecall.status).toBe(200)
+
+    const history = await app.request('/api/v1/public/messages?limit=100', {
+      headers: { cookie: other.cookie },
+    })
+    const historyBody = (await history.json()) as {
+      messages: Array<{ id: string; text: string; recalledAt?: string }>
+    }
+    expect(historyBody.messages.find((candidate) => candidate.id === message.id)).toMatchObject({
+      text: '',
+      recalledAt: expect.any(String),
+    })
   })
 
   test('classifies inline images and videos by MIME type', async () => {

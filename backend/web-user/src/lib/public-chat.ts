@@ -72,6 +72,15 @@ export async function sendPublicMessage(
   }
 }
 
+export async function recallPublicMessage(messageId: string): Promise<PublicMessage> {
+  try {
+    const response = await api.delete(`/api/v1/public/messages/${encodeURIComponent(messageId)}`)
+    return publicMessageSchema.parse(response.data)
+  } catch (error) {
+    throw normalizeError(error)
+  }
+}
+
 export async function uploadPublicAttachment(
   file: File,
   onProgress?: (percent: number) => void,

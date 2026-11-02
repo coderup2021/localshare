@@ -2,6 +2,7 @@ import { publicRealtimeEventSchema, type PublicMessage } from '@localshare/contr
 
 type RealtimeOptions = {
   onMessage: (message: PublicMessage) => void
+  onMessageRecalled: (message: PublicMessage) => void
   onConnected: () => void
   onDisconnected: () => void
 }
@@ -28,8 +29,12 @@ export function connectPublicRealtime(options: RealtimeOptions) {
 
       try {
         const parsed = publicRealtimeEventSchema.safeParse(JSON.parse(event.data))
-        if (parsed.success && parsed.data.type === 'message.created') {
+        if (!parsed.success) return
+
+        if (parsed.data.type === 'message.created') {
           options.onMessage(parsed.data.message)
+        } else if (parsed.data.type === 'message.recalled') {
+          options.onMessageRecalled(parsed.data.message)
         }
       } catch {
         // Ignore malformed realtime frames; HTTP history remains authoritative.

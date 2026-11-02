@@ -11,6 +11,7 @@ import {
   bootstrapPublicChat,
   createClientRequestId,
   fetchPublicMessages,
+  recallPublicMessage,
   sendPublicMessage,
   uploadPublicAttachment,
 } from '../lib/public-chat'
@@ -31,6 +32,7 @@ type PublicChatState = {
   uploadFileIndex: number
   uploadFileTotal: number
   uploadFileName: string | null
+  recallingMessageId: string | null
   realtimeConnected: boolean
   error: string | null
   initialize: () => Promise<void>
@@ -38,13 +40,22 @@ type PublicChatState = {
   loadOlder: () => Promise<void>
   send: (request: CreatePublicMessageRequest) => Promise<boolean>
   sendFiles: (files: File[]) => Promise<boolean>
+  recall: (messageId: string) => Promise<boolean>
   receiveMessage: (message: PublicMessage) => void
+  receiveMessageRecalled: (message: PublicMessage) => void
   setRealtimeConnected: (connected: boolean) => void
 }
 
 function messageFromError(error: unknown) {
   if (error instanceof PublicChatError) return error.message
   return error instanceof Error ? error.message : '消息服务暂时不可用'
+}
+
+function upsertMessage(messages: PublicMessage[], message: PublicMessage) {
+  return messages
+    .filter((existing) => existing.id !== message.id)
+    .concat(message)
+    .sort((left, right) => left.seq - right.seq)
 }
 
 export const usePublicChatStore = create<PublicChatState>((set, get) => ({
@@ -63,6 +74,7 @@ export const usePublicChatStore = create<PublicChatState>((set, get) => ({
   uploadFileIndex: 0,
   uploadFileTotal: 0,
   uploadFileName: null,
+  recallingMessageId: null,
   realtimeConnected: false,
   error: null,
   initialize: async () => {
@@ -143,10 +155,7 @@ export const usePublicChatStore = create<PublicChatState>((set, get) => ({
     set({ sending: true, error: null })
     try {
       const message = await sendPublicMessage(request)
-      const nextMessages = get()
-        .messages.filter((existing) => existing.id !== message.id)
-        .concat(message)
-        .sort((left, right) => left.seq - right.seq)
+      const nextMessages = upsertMessage(get().messages, message)
 
       set({ messages: nextMessages, sending: false })
       return true
@@ -187,10 +196,7 @@ export const usePublicChatStore = create<PublicChatState>((set, get) => ({
           attachmentId: attachment.id,
           clientRequestId: createClientRequestId(),
         })
-        const nextMessages = get()
-          .messages.filter((existing) => existing.id !== message.id)
-          .concat(message)
-          .sort((left, right) => left.seq - right.seq)
+        const nextMessages = upsertMessage(get().messages, message)
 
         set({ messages: nextMessages })
       } catch (error) {
@@ -216,13 +222,30 @@ export const usePublicChatStore = create<PublicChatState>((set, get) => ({
     })
     return true
   },
-  receiveMessage: (message) => {
-    const nextMessages = get()
-      .messages.filter((existing) => existing.id !== message.id)
-      .concat(message)
-      .sort((left, right) => left.seq - right.seq)
+  recall: async (messageId) => {
+    if (get().recallingMessageId) return false
 
-    set({ messages: nextMessages, error: null })
+    set({ recallingMessageId: messageId, error: null })
+    try {
+      const message = await recallPublicMessage(messageId)
+      set({
+        messages: upsertMessage(get().messages, message),
+        recallingMessageId: null,
+      })
+      return true
+    } catch (error) {
+      set({
+        recallingMessageId: null,
+        error: messageFromError(error),
+      })
+      return false
+    }
+  },
+  receiveMessage: (message) => {
+    set({ messages: upsertMessage(get().messages, message), error: null })
+  },
+  receiveMessageRecalled: (message) => {
+    set({ messages: upsertMessage(get().messages, message), error: null })
   },
   setRealtimeConnected: (connected) => set({ realtimeConnected: connected }),
 }))

@@ -98,4 +98,25 @@ describe('API contracts', () => {
       }).success,
     ).toBe(true)
   })
+
+  test('validates recalled message events', () => {
+    expect(
+      publicRealtimeEventSchema.safeParse({
+        type: 'message.recalled',
+        eventId: crypto.randomUUID(),
+        occurredAt: '2026-11-02T10:01:00.000Z',
+        message: {
+          id: 'message-1',
+          seq: 1,
+          senderType: 'visitor',
+          senderId: 'visitor-1',
+          senderName: '访客',
+          kind: 'text',
+          text: '',
+          createdAt: '2026-11-02T10:00:00.000Z',
+          recalledAt: '2026-11-02T10:01:00.000Z',
+        },
+      }).success,
+    ).toBe(true)
+  })
 })
