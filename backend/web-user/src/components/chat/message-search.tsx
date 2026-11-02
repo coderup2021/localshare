@@ -167,7 +167,7 @@ export function MessageSearch({ onSelectMessage }: MessageSearchProps) {
         <div
           id="message-search-results"
           aria-label="搜索结果"
-          className="absolute right-0 top-full z-30 mt-2 max-h-80 w-[min(22rem,calc(100vw-4rem))] overflow-y-auto rounded-2xl border border-border bg-card p-2 shadow-[0_20px_60px_-24px_rgba(20,30,24,0.55)]"
+          className="search-results-scrollbar absolute right-0 top-full z-30 mt-2 max-h-80 w-[min(22rem,calc(100vw-4rem))] overflow-y-auto rounded-2xl border border-border bg-card p-2 shadow-[0_20px_60px_-24px_rgba(20,30,24,0.55)]"
         >
           {searching ? (
             <p className="px-3 py-4 text-center text-xs text-muted-foreground">搜索中…</p>
