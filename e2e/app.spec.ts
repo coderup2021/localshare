@@ -146,6 +146,34 @@ test('user message is visible to another anonymous browser', async ({ browser, p
   })
   await expect(page.getByRole('img', { name: secondImageName })).toBeVisible()
 
+  const pastedImageName = `pasted-${Date.now()}.png`
+  const pastedImageBytes = Array.from(
+    Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2nH0AAAAASUVORK5CYII=',
+      'base64',
+    ),
+  )
+  await page.getByLabel('消息内容').evaluate(
+    (element, { bytes, name }) => {
+      const DataTransferConstructor = Reflect.get(globalThis, 'DataTransfer')
+      const ClipboardEventConstructor = Reflect.get(globalThis, 'ClipboardEvent')
+      const transfer = new DataTransferConstructor()
+      transfer.items.add(new File([new Uint8Array(bytes)], name, { type: 'image/png' }))
+      element.dispatchEvent(
+        new ClipboardEventConstructor('paste', {
+          clipboardData: transfer,
+          bubbles: true,
+          cancelable: true,
+        }),
+      )
+    },
+    { bytes: pastedImageBytes, name: pastedImageName },
+  )
+  await expect(page.getByRole('img', { name: pastedImageName })).toBeVisible()
+  await expect(secondPage.getByRole('img', { name: pastedImageName })).toBeVisible({
+    timeout: 5_000,
+  })
+
   await page.getByRole('button', { name: `查看图片 ${imageName}` }).click()
   const imageViewer = page.getByRole('dialog', { name: '图片预览' })
   await expect(imageViewer.getByRole('img', { name: imageName })).toBeVisible()

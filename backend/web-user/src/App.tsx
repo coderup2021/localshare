@@ -3,6 +3,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type ClipboardEvent as ReactClipboardEvent,
   type DragEvent,
   type FormEvent,
   type MouseEvent as ReactMouseEvent,
@@ -261,6 +262,21 @@ export function App() {
     sendSelectedFiles(Array.from(event.dataTransfer.files))
   }
 
+  const handleComposerPaste = (event: ReactClipboardEvent<HTMLTextAreaElement>) => {
+    const itemImages = Array.from(event.clipboardData.items)
+      .filter((item) => item.kind === 'file' && item.type.startsWith('image/'))
+      .map((item) => item.getAsFile())
+      .filter((file): file is File => Boolean(file))
+    const images =
+      itemImages.length > 0
+        ? itemImages
+        : Array.from(event.clipboardData.files).filter((file) => file.type.startsWith('image/'))
+
+    if (images.length === 0) return
+    event.preventDefault()
+    sendSelectedFiles(images)
+  }
+
   const pauseStickingToLatest = () => {
     stickToLatestRef.current = false
   }
@@ -462,7 +478,7 @@ export function App() {
             ref={messageListRef}
             id="message-list"
             aria-label="消息列表"
-            className="min-h-0 flex-1 overflow-y-auto bg-background/40 px-4 py-6 sm:px-7"
+            className="chat-message-scrollbar min-h-0 flex-1 overflow-y-auto bg-background/40 px-4 py-6 sm:px-7"
             aria-live="polite"
             onWheel={pauseStickingToLatest}
             onTouchMove={pauseStickingToLatest}
@@ -542,16 +558,21 @@ export function App() {
                               <button
                                 type="button"
                                 aria-label={`查看图片 ${message.attachment.name}`}
-                                className="mb-2 block cursor-zoom-in overflow-hidden rounded-xl"
+                                className="mb-2 block w-full cursor-zoom-in overflow-hidden rounded-xl border border-current/10 bg-black/5"
                                 onClick={() => setViewerImageId(message.id)}
                               >
-                                <img
-                                  src={message.attachment.url}
-                                  alt={message.attachment.name}
-                                  loading="lazy"
-                                  className="max-h-80 w-full object-contain"
-                                  onLoad={handleMediaLoaded}
-                                />
+                                <span className="flex min-h-20 items-center justify-center">
+                                  <img
+                                    src={message.attachment.url}
+                                    alt={message.attachment.name}
+                                    loading="lazy"
+                                    className="max-h-80 w-full object-contain"
+                                    onLoad={handleMediaLoaded}
+                                  />
+                                </span>
+                                <span className="block truncate border-t border-current/10 px-2.5 py-1.5 text-left text-[11px] opacity-70">
+                                  {message.attachment.name}
+                                </span>
                               </button>
                             ) : null}
                             {message.attachment?.kind === 'video' ? (
@@ -690,6 +711,7 @@ export function App() {
                   event.currentTarget.form?.requestSubmit()
                 }
               }}
+              onPaste={handleComposerPaste}
               placeholder="输入消息，Enter 发送，Shift+Enter 换行"
               rows={4}
               maxLength={2_000}
