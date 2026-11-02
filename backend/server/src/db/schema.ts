@@ -1,4 +1,4 @@
-import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 export const runtimeMeta = sqliteTable('runtime_meta', {
   key: text('key').primaryKey(),
@@ -26,3 +26,52 @@ export const adminSessions = sqliteTable('admin_sessions', {
   expiresAt: integer('expires_at', { mode: 'number' }).notNull(),
   revokedAt: integer('revoked_at', { mode: 'number' }),
 })
+
+export const anonymousVisitors = sqliteTable('anonymous_visitors', {
+  id: text('id').primaryKey(),
+  displayName: text('display_name').notNull(),
+  createdAt: integer('created_at', { mode: 'number' }).notNull(),
+  lastSeenAt: integer('last_seen_at', { mode: 'number' }).notNull(),
+})
+
+export const conversations = sqliteTable(
+  'conversations',
+  {
+    id: text('id').primaryKey(),
+    slug: text('slug').notNull(),
+    type: text('type').notNull(),
+    title: text('title').notNull(),
+    nextSeq: integer('next_seq', { mode: 'number' }).notNull().default(1),
+    createdAt: integer('created_at', { mode: 'number' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'number' }).notNull(),
+  },
+  (table) => [uniqueIndex('conversations_slug_unique').on(table.slug)],
+)
+
+export const messages = sqliteTable(
+  'messages',
+  {
+    id: text('id').primaryKey(),
+    conversationId: text('conversation_id')
+      .notNull()
+      .references(() => conversations.id, { onDelete: 'cascade' }),
+    seq: integer('seq', { mode: 'number' }).notNull(),
+    senderType: text('sender_type').notNull(),
+    senderId: text('sender_id').notNull(),
+    senderName: text('sender_name').notNull(),
+    kind: text('kind').notNull(),
+    text: text('text').notNull(),
+    clientRequestId: text('client_request_id').notNull(),
+    createdAt: integer('created_at', { mode: 'number' }).notNull(),
+    deletedAt: integer('deleted_at', { mode: 'number' }),
+  },
+  (table) => [
+    uniqueIndex('messages_conversation_seq_unique').on(table.conversationId, table.seq),
+    uniqueIndex('messages_sender_request_unique').on(
+      table.senderType,
+      table.senderId,
+      table.clientRequestId,
+    ),
+    index('messages_conversation_created_idx').on(table.conversationId, table.createdAt),
+  ],
+)

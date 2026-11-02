@@ -15,6 +15,13 @@
       "when": 1793587776420,
       "tag": "0001_puzzling_echo",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1793588348814,
+      "tag": "0002_clever_dark_phoenix",
+      "breakpoints": true
     }
   ]
 }

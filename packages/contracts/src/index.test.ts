@@ -5,7 +5,9 @@ import {
   adminPasswordChangeRequestSchema,
   adminLoginRequestSchema,
   apiErrorSchema,
+  createPublicMessageRequestSchema,
   healthStatusSchema,
+  publicMessageSchema,
 } from './index'
 
 describe('API contracts', () => {
@@ -48,5 +50,31 @@ describe('API contracts', () => {
         newPassword: 'short',
       }).success,
     ).toBe(false)
+  })
+
+  test('accepts text messages and rejects blank content', () => {
+    const request = {
+      text: 'hello',
+      clientRequestId: crypto.randomUUID(),
+    }
+    expect(createPublicMessageRequestSchema.safeParse(request).success).toBe(true)
+    expect(createPublicMessageRequestSchema.safeParse({ ...request, text: '   ' }).success).toBe(
+      false,
+    )
+  })
+
+  test('validates public message responses', () => {
+    expect(
+      publicMessageSchema.safeParse({
+        id: 'message-1',
+        seq: 1,
+        senderType: 'visitor',
+        senderId: 'visitor-1',
+        senderName: '访客',
+        kind: 'text',
+        text: 'hello',
+        createdAt: '2026-11-02T10:00:00.000Z',
+      }).success,
+    ).toBe(true)
   })
 })

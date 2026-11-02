@@ -3,12 +3,15 @@ import { Hono } from 'hono'
 
 import { createAdminAuthRoutes } from './modules/admin-auth/admin-auth.route'
 import type { AdminAuthService } from './modules/admin-auth/admin-auth.service'
+import { createPublicChatRoutes } from './modules/public-chat/public-chat.route'
+import type { PublicChatService } from './modules/public-chat/public-chat.service'
 import { HttpError } from './shared/http-error'
 import type { RequestEnvironment } from './shared/types'
 
 type AppDependencies = {
   isDatabaseReady: () => boolean
   adminAuth?: AdminAuthService
+  publicChat?: PublicChatService
 }
 
 export function createApp(dependencies: AppDependencies) {
@@ -55,6 +58,10 @@ export function createApp(dependencies: AppDependencies) {
 
   if (dependencies.adminAuth) {
     app.route('/api/v1/admin/auth', createAdminAuthRoutes(dependencies.adminAuth))
+  }
+
+  if (dependencies.publicChat) {
+    app.route('/api/v1/public', createPublicChatRoutes(dependencies.publicChat))
   }
 
   app.notFound((context) => {

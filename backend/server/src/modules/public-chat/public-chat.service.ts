@@ -1,0 +1,226 @@
+import {
+  PUBLIC_CONVERSATION_SLUG,
+  type CreatePublicMessageRequest,
+  type PublicBootstrapResponse,
+  type PublicMessage,
+  type PublicMessageListResponse,
+} from '@localshare/contracts'
+import { and, desc, eq, lt } from 'drizzle-orm'
+
+import { ensurePublicConversation } from '../../db/bootstrap'
+import type { DatabaseClient } from '../../db/client'
+import { anonymousVisitors, conversations, messages } from '../../db/schema'
+import { HttpError } from '../../shared/http-error'
+
+function createVisitorId() {
+  return crypto.randomUUID()
+}
+
+function displayNameForVisitor(id: string) {
+  return `访客-${id.replaceAll('-', '').slice(0, 4).toUpperCase()}`
+}
+
+function toPublicMessage(row: typeof messages.$inferSelect): PublicMessage {
+  return {
+    id: row.id,
+    seq: row.seq,
+    senderType: row.senderType === 'admin' ? 'admin' : 'visitor',
+    senderId: row.senderId,
+    senderName: row.senderName,
+    kind: 'text',
+    text: row.text,
+    createdAt: new Date(row.createdAt).toISOString(),
+  }
+}
+
+export class PublicChatService {
+  constructor(private readonly client: DatabaseClient) {}
+
+  async bootstrap(
+    existingVisitorId: string | undefined,
+  ): Promise<Omit<PublicBootstrapResponse, 'canSend'>> {
+    await ensurePublicConversation(this.client)
+    const now = Date.now()
+
+    let visitor = existingVisitorId
+      ? await this.client.db
+          .select()
+          .from(anonymousVisitors)
+          .where(eq(anonymousVisitors.id, existingVisitorId))
+          .limit(1)
+          .then((rows) => rows[0])
+      : undefined
+
+    if (!visitor) {
+      const id = createVisitorId()
+      visitor = {
+        id,
+        displayName: displayNameForVisitor(id),
+        createdAt: now,
+        lastSeenAt: now,
+      }
+      await this.client.db.insert(anonymousVisitors).values(visitor)
+    } else {
+      await this.client.db
+        .update(anonymousVisitors)
+        .set({ lastSeenAt: now })
+        .where(eq(anonymousVisitors.id, visitor.id))
+    }
+
+    const conversation = await this.client.db
+      .select()
+      .from(conversations)
+      .where(eq(conversations.slug, PUBLIC_CONVERSATION_SLUG))
+      .limit(1)
+      .then((rows) => rows[0])
+
+    if (!conversation) {
+      throw new HttpError('PUBLIC_CONVERSATION_MISSING', 409, 'Public conversation is unavailable')
+    }
+
+    return {
+      visitor: {
+        id: visitor.id,
+        displayName: visitor.displayName,
+      },
+      conversation: {
+        id: conversation.id,
+        slug: PUBLIC_CONVERSATION_SLUG,
+        title: conversation.title,
+      },
+    }
+  }
+
+  async listMessages(
+    beforeSeq: number | undefined,
+    limit: number,
+  ): Promise<PublicMessageListResponse> {
+    const conversation = await this.getPublicConversation()
+    const conditions = beforeSeq
+      ? and(eq(messages.conversationId, conversation.id), lt(messages.seq, beforeSeq))
+      : eq(messages.conversationId, conversation.id)
+
+    const rows = await this.client.db
+      .select()
+      .from(messages)
+      .where(conditions)
+      .orderBy(desc(messages.seq))
+      .limit(limit + 1)
+
+    const hasMore = rows.length > limit
+    const page = rows.slice(0, limit).reverse()
+
+    return {
+      messages: page.map(toPublicMessage),
+      hasMore,
+      nextBeforeSeq: hasMore && page[0] ? page[0].seq : null,
+    }
+  }
+
+  async createMessage(
+    visitorId: string,
+    request: CreatePublicMessageRequest,
+  ): Promise<{ message: PublicMessage; created: boolean }> {
+    const visitor = await this.client.db
+      .select()
+      .from(anonymousVisitors)
+      .where(eq(anonymousVisitors.id, visitorId))
+      .limit(1)
+      .then((rows) => rows[0])
+
+    if (!visitor) {
+      throw new HttpError('VISITOR_REQUIRED', 401, 'Refresh the public channel before sending')
+    }
+
+    const conversation = await this.getPublicConversation()
+    const existing = await this.client.db
+      .select()
+      .from(messages)
+      .where(
+        and(
+          eq(messages.senderType, 'visitor'),
+          eq(messages.senderId, visitor.id),
+          eq(messages.clientRequestId, request.clientRequestId),
+        ),
+      )
+      .limit(1)
+      .then((rows) => rows[0])
+
+    if (existing) {
+      return {
+        message: toPublicMessage(existing),
+        created: false,
+      }
+    }
+
+    const message = await this.client.db.transaction(async (transaction) => {
+      const current = await transaction
+        .select({ nextSeq: conversations.nextSeq })
+        .from(conversations)
+        .where(eq(conversations.id, conversation.id))
+        .limit(1)
+        .then((rows) => rows[0])
+
+      if (!current) {
+        throw new HttpError(
+          'PUBLIC_CONVERSATION_MISSING',
+          409,
+          'Public conversation is unavailable',
+        )
+      }
+
+      const now = Date.now()
+      const row: typeof messages.$inferInsert = {
+        id: crypto.randomUUID(),
+        conversationId: conversation.id,
+        seq: current.nextSeq,
+        senderType: 'visitor',
+        senderId: visitor.id,
+        senderName: visitor.displayName,
+        kind: 'text',
+        text: request.text,
+        clientRequestId: request.clientRequestId,
+        createdAt: now,
+      }
+
+      await transaction
+        .update(conversations)
+        .set({
+          nextSeq: current.nextSeq + 1,
+          updatedAt: now,
+        })
+        .where(eq(conversations.id, conversation.id))
+
+      await transaction.insert(messages).values(row)
+
+      return {
+        ...row,
+        id: row.id,
+      }
+    })
+
+    return {
+      message: toPublicMessage({
+        ...message,
+        deletedAt: null,
+      }),
+      created: true,
+    }
+  }
+
+  private async getPublicConversation() {
+    await ensurePublicConversation(this.client)
+    const conversation = await this.client.db
+      .select()
+      .from(conversations)
+      .where(eq(conversations.slug, PUBLIC_CONVERSATION_SLUG))
+      .limit(1)
+      .then((rows) => rows[0])
+
+    if (!conversation) {
+      throw new HttpError('PUBLIC_CONVERSATION_MISSING', 409, 'Public conversation is unavailable')
+    }
+
+    return conversation
+  }
+}

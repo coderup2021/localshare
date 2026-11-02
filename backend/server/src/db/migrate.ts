@@ -1,5 +1,5 @@
 import { loadConfig } from '../config/env'
-import { ensureDefaultAdmin } from './bootstrap'
+import { ensureDefaultAdmin, ensurePublicConversation } from './bootstrap'
 import { initializeDatabase, isDatabaseReady } from './client'
 
 const config = loadConfig()
@@ -10,5 +10,6 @@ if (!isDatabaseReady(client)) {
 }
 
 await ensureDefaultAdmin(client)
+await ensurePublicConversation(client)
 client.sqlite.close()
 console.log(`Database migrated successfully in ${config.dataDir}`)

@@ -62,3 +62,56 @@ export type AdminPasswordChangeRequest = z.infer<typeof adminPasswordChangeReque
 export const adminPasswordChangeResponseSchema = z.object({
   requiresLogin: z.literal(true),
 })
+
+export const PUBLIC_CONVERSATION_SLUG = 'public' as const
+
+export const publicVisitorSchema = z.object({
+  id: z.string().min(1),
+  displayName: z.string().min(1),
+})
+
+export type PublicVisitor = z.infer<typeof publicVisitorSchema>
+
+export const publicConversationSchema = z.object({
+  id: z.string().min(1),
+  slug: z.literal(PUBLIC_CONVERSATION_SLUG),
+  title: z.string().min(1),
+})
+
+export type PublicConversation = z.infer<typeof publicConversationSchema>
+
+export const publicBootstrapResponseSchema = z.object({
+  visitor: publicVisitorSchema,
+  conversation: publicConversationSchema,
+  canSend: z.boolean(),
+})
+
+export type PublicBootstrapResponse = z.infer<typeof publicBootstrapResponseSchema>
+
+export const publicMessageSchema = z.object({
+  id: z.string().min(1),
+  seq: z.number().int().positive(),
+  senderType: z.enum(['visitor', 'admin']),
+  senderId: z.string().min(1),
+  senderName: z.string().min(1),
+  kind: z.literal('text'),
+  text: z.string(),
+  createdAt: z.iso.datetime(),
+})
+
+export type PublicMessage = z.infer<typeof publicMessageSchema>
+
+export const publicMessageListResponseSchema = z.object({
+  messages: z.array(publicMessageSchema),
+  hasMore: z.boolean(),
+  nextBeforeSeq: z.number().int().positive().nullable(),
+})
+
+export type PublicMessageListResponse = z.infer<typeof publicMessageListResponseSchema>
+
+export const createPublicMessageRequestSchema = z.object({
+  text: z.string().trim().min(1).max(2_000),
+  clientRequestId: z.uuid(),
+})
+
+export type CreatePublicMessageRequest = z.infer<typeof createPublicMessageRequestSchema>
