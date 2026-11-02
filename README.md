@@ -100,9 +100,17 @@ bun run install:local
 bun run publish:npm
 ```
 
-命令会先检查登录、构建 tarball，然后按平台包、主包顺序发布。每个包发布前
-会单独提示输入当前 npm Authenticator OTP；若平台包已发布而主包失败，重跑时
-会自动跳过已存在的版本。
+命令从本地 `.env.publish` 读取 `NPM_ACCESS_TOKEN`，不提示 OTP，并按平台包、
+主包顺序执行 `npm stage publish`。随后需要在 npm 包管理页面审核 staged
+版本并批准到 production。
+
+```text
+.env.publish
+NPM_ACCESS_TOKEN=<npm granular access token>
+```
+
+`.env.publish` 已被 Git 忽略。token 只在子进程中通过环境变量传递，不写入
+tarball、日志或实例配置。
 
 当前发布物支持 Linux x64；不支持平台会明确失败。安装阶段不会启动服务或创建业务数据。
 

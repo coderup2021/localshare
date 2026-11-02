@@ -1,12 +1,11 @@
 import { readFileSync } from 'node:fs'
-import { basename, join } from 'node:path'
-import { createInterface } from 'node:readline/promises'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const registry = 'https://registry.npmjs.org/'
 const root = fileURLToPath(new URL('..', import.meta.url))
 const manifestPath = join(root, '.release', 'npm', 'manifest.json')
-const artifactsDir = join(root, '.release', 'npm', 'artifacts')
+const publishEnvPath = join(root, '.env.publish')
 
 type ReleaseManifest = {
   version: string
@@ -14,9 +13,31 @@ type ReleaseManifest = {
   artifacts: string[]
 }
 
-function run(command: string[], env: NodeJS.ProcessEnv = process.env) {
+function readPublishToken() {
+  const content = readFileSync(publishEnvPath, 'utf8')
+  for (const line of content.split(/\r?\n/)) {
+    const match = /^\s*NPM_ACCESS_TOKEN\s*=\s*(.*)\s*$/.exec(line)
+    if (!match) continue
+
+    const value = (match[1] ?? '').trim().replace(/^(['"])(.*)\1$/, '$2')
+    if (value) return value
+  }
+  throw new Error('NPM_ACCESS_TOKEN is missing from .env.publish')
+}
+
+function npmEnvironment(token: string): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    npm_config_registry: registry,
+    'npm_config_//registry.npmjs.org/:_authToken': token,
+  }
+  delete env.npm_config_otp
+  return env
+}
+
+function run(command: string[], cwd = root, env: NodeJS.ProcessEnv = process.env) {
   const result = Bun.spawnSync(command, {
-    cwd: root,
+    cwd,
     env,
     stdout: 'inherit',
     stderr: 'inherit',
@@ -26,101 +47,63 @@ function run(command: string[], env: NodeJS.ProcessEnv = process.env) {
   }
 }
 
-function capture(command: string[]) {
+function capture(command: string[], env: NodeJS.ProcessEnv) {
   return Bun.spawnSync(command, {
     cwd: root,
+    env,
     stdout: 'pipe',
     stderr: 'pipe',
   })
 }
 
-function registryHasVersion(packageName: string, version: string) {
-  const result = capture([
-    'npm',
-    'view',
-    `${packageName}@${version}`,
-    'version',
-    '--json',
-    `--registry=${registry}`,
-  ])
-  return result.exitCode === 0
+function stagePackage(packageName: string, packageDirectory: string, env: NodeJS.ProcessEnv) {
+  console.log('')
+  console.log(`Staging ${packageName}`)
+  run(['npm', 'stage', 'publish', '--tag=latest', `--registry=${registry}`], packageDirectory, env)
 }
 
-async function promptOtp(packageName: string, version: string) {
-  if (!process.stdin.isTTY) {
-    throw new Error('OTP input requires an interactive terminal')
-  }
-
-  const readline = createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  })
-  try {
-    console.log('')
-    console.log(`Publishing ${packageName}@${version}`)
-    console.log('Use the current TOTP from your npm authenticator app or security key.')
-    const answer = await readline.question('Npm OTP (blank if 2FA is disabled): ')
-    return answer.trim()
-  } finally {
-    readline.close()
+function printStageList(packageName: string, env: NodeJS.ProcessEnv) {
+  const result = capture(
+    ['npm', 'stage', 'list', packageName, '--json', `--registry=${registry}`],
+    env,
+  )
+  if (result.exitCode === 0) {
+    console.log(`Staged versions for ${packageName}:`)
+    console.log(result.stdout.toString().trim())
+  } else {
+    console.log(`Inspect staged versions with: npm stage list ${packageName}`)
   }
 }
 
-function publish(artifact: string, otp: string) {
-  const env: NodeJS.ProcessEnv = {
-    ...process.env,
-    npm_config_registry: registry,
-  }
-  if (otp) env.npm_config_otp = otp
-
-  run(['npm', 'publish', artifact, `--registry=${registry}`], env)
-}
-
-async function publishPackage(packageName: string, version: string, artifactName: string) {
-  if (registryHasVersion(packageName, version)) {
-    console.log(`Already published: ${packageName}@${version}`)
-    return
-  }
-
-  const otp = await promptOtp(packageName, version)
-  const artifact = join(artifactsDir, basename(artifactName))
-  publish(artifact, otp)
-
-  if (!registryHasVersion(packageName, version)) {
-    throw new Error(`Publish finished but ${packageName}@${version} is not visible in npm`)
-  }
-  console.log(`Published: ${packageName}@${version}`)
-}
-
-async function main() {
-  const whoami = capture(['npm', 'whoami', `--registry=${registry}`])
+function main() {
+  const token = readPublishToken()
+  const env = npmEnvironment(token)
+  const whoami = capture(['npm', 'whoami', `--registry=${registry}`], env)
   if (whoami.exitCode !== 0) {
-    throw new Error('Not logged in to npm. Run: npm login --registry=https://registry.npmjs.org/')
+    throw new Error('NPM_ACCESS_TOKEN is invalid or does not have access to npm')
   }
-  console.log(`Npm account: ${whoami.stdout.toString().trim()}`)
+  console.log(`Npm token account: ${whoami.stdout.toString().trim()}`)
 
   run(['bun', 'run', 'pack:server'])
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as ReleaseManifest
-  const platformArtifact = manifest.artifacts.find((artifact) =>
-    artifact.startsWith(`${manifest.platform}-`),
-  )
-  const mainArtifact = manifest.artifacts.find(
-    (artifact) =>
-      artifact.startsWith('localshare-server-') && !artifact.startsWith(`${manifest.platform}-`),
-  )
+  const releaseRoot = join(root, '.release', 'npm')
+  const platformDirectory = join(releaseRoot, manifest.platform)
+  const mainDirectory = join(releaseRoot, 'localshare-server')
 
-  if (!platformArtifact || !mainArtifact) {
-    throw new Error('Release manifest does not contain both npm artifacts')
-  }
+  stagePackage(manifest.platform, platformDirectory, env)
+  stagePackage('localshare-server', mainDirectory, env)
 
-  await publishPackage(manifest.platform, manifest.version, platformArtifact)
-  await publishPackage('localshare-server', manifest.version, mainArtifact)
+  printStageList(manifest.platform, env)
+  printStageList('localshare-server', env)
 
   console.log('')
-  console.log(`Published LocalShare ${manifest.version} successfully.`)
+  console.log(`LocalShare ${manifest.version} staged successfully.`)
+  console.log('Review and approve the staged versions in the npm package web interface.')
 }
 
-main().catch((error) => {
-  console.error(`publish-npm: ${error.message}`)
+try {
+  main()
+} catch (error) {
+  console.error(`publish-npm: ${error instanceof Error ? error.message : String(error)}`)
   process.exitCode = 1
-})
+}
