@@ -11,7 +11,7 @@ LocalShare 是运行在本地局域网内的信息分享与即时通信软件。
 - 第一期：`server`、`user-web`、`admin-web`
 - 后续：`app-desktop`、`app-mobile`
 
-M0 工程基础、管理员认证、public 实时文本和附件纵切已完成（2026-11-02）：普通访问者可自动获得匿名访客身份，在唯一公共频道发送文本、图片、视频和文件；所有能访问 `7777` 的局域网客户端均可发送。新消息通过 WebSocket 实时广播，客户端断线后自动重连并用 HTTP 历史补齐。附件元数据保存在 SQLite，文件内容保存在数据目录。管理员可用 `localShare` 登录、保持会话、退出和修改密码。一期完成时，应能在一台局域网主机上部署：普通用户无需登录即可通过 user-web 进入公共频道、聊天和收发附件；管理员通过 admin-web 使用唯一账户 `localShare` 登录。最终产物还必须能从 npm 仓库安装，并通过命令行管理服务生命周期。
+M0 工程基础、管理员认证、public 实时文本和附件纵切已完成（2026-11-02）：普通访问者可自动获得匿名访客身份，在唯一公共频道发送文本、图片、视频和文件；开发环境通过 `7777`、生产环境通过 `8888` 访问 Web。新消息通过 WebSocket 实时广播，客户端断线后自动重连并用 HTTP 历史补齐。附件元数据保存在 SQLite，文件内容保存在数据目录。管理员可用 `localShare` 登录、保持会话、退出和修改密码。一期完成时，应能在一台局域网主机上部署：普通用户无需登录即可通过 user-web 进入公共频道、聊天和收发附件；管理员通过 admin-web 使用唯一账户 `localShare` 登录。最终产物还必须能从 npm 仓库安装，并通过命令行管理服务生命周期。
 
 ## 当前目录
 
@@ -39,16 +39,16 @@ M0 工程基础、管理员认证、public 实时文本和附件纵切已完成�
 
 固定端口约定：
 
-- HTTP API 和 WebSocket 在开发和生产的服务端口均为 `5678`。
-- Web 对外入口在开发和生产均为 `7777`。
+- 开发环境 HTTP API/WebSocket 使用 `5678`，统一 Web 入口使用 `7777`。
+- 生产环境 HTTP API/WebSocket 使用 `8887`，统一 Web 入口使用 `8888`。
 - user-web 使用 `/`，admin-web 使用 `/admin/`。两个应用通过同一个 Web 入口访问，不分别占用对外端口。
-- 开发期内部 Vite 端口可以不同，但必须由根脚本通过 `7777` 统一代理；生产期由端口 `7777` 上的静态资源服务/反向代理统一暴露，并将 `/api`、`/ws` 转发到 `5678`。
+- 开发期内部 Vite 端口可以不同，但必须由根脚本通过 `7777` 统一代理；生产期由端口 `8888` 上的静态资源服务统一暴露，并将 `/api`、`/ws` 路由到同一服务进程的 `8887` API listener。
 - npm 发布版首次启动时必须通过命令行指定数据目录和本机 IPv4 地址；两个监听端口固定绑定到该 IPv4。
 
 最终 npm 使用形态（包名在发布前确认）：
 
 ```bash
-npm install -g <localshare-server-package>
+npm install -g localshare-server
 localshare start --data-dir /srv/localshare --ip 192.168.1.10
 localshare stop
 localshare restart
@@ -126,7 +126,7 @@ CodeGraph 查询失败或索引暂时不可用时，应明确记录原因并采�
 5. 先定义共享契约或 Drizzle schema，再实现服务端，最后接入 Web 客户端。
 6. 完成代码修改后执行 `codegraph sync .` 和 `codegraph status .`，再运行与风险匹配的检查；只要涉及可运行代码或用户界面，还必须执行真实浏览器 E2E，最后更新路线图状态或决策记录。
 
-根目录脚本现已可用；`pack:server` 属于 M6 目标：
+根目录脚本现已可用；`pack:server` 生成 Linux x64 主包和平台包 tarball：
 
 ```bash
 bun install
@@ -134,7 +134,7 @@ bun run dev            # API/WS: 5678；统一 Web 入口: 7777
 bun run check          # typecheck + lint + test + build
 bun run db:generate    # 生成 Drizzle migration
 bun run db:migrate     # 应用 migration
-bun run pack:server    # M6：构建并生成可检查的 npm tarball
+bun run pack:server    # 构建并生成可检查的 npm tarball
 ```
 
 每个 workspace 的准确命令以其 `package.json` 为准；新增或改变脚本时同步本文件和 README。
@@ -147,7 +147,7 @@ bun run pack:server    # M6：构建并生成可检查的 npm tarball
 4. **数据库变更必须可追踪。** 只通过 Drizzle schema 和提交到仓库的 migration 修改数据库；禁止手工改生产数据库结构。
 5. **附件只存元数据到 SQLite。** 文件内容写入配置的数据目录；数据库只保存归属、存储键、MIME、大小、哈希和生命周期状态。
 6. **只有管理员需要鉴权。** user-web 不登录；所有管理接口都由服务端校验唯一管理员账户 `localShare` 的登录态。前端隐藏按钮不是权限控制。
-7. **浏览器侧同源访问。** Web 入口固定在 `7777`，由它反向代理 `/api` 和 `/ws` 到 `5678`，避免浏览器端 CORS 与 Cookie 差异。只有反代失效时才考虑给 `5678` 增加跨域配置。
+7. **浏览器侧同源访问。** 开发 Web 入口为 `7777`、生产 Web 入口为 `8888`；浏览器统一通过 Web 入口访问 `/api` 和 `/ws`，避免 CORS 与 Cookie 差异。
 8. **局域网不等于可信网络。** 仍然需要密码哈希、会话过期、输入校验、上传限制、速率限制和路径穿越防护。
 9. **一期只有一个 public 频道。** 所有读取和发送者都可见同一频道；不实现私聊、群聊、成员关系或用户目录。匿名访客不能访问任何管理能力。
 10. **不要提前实现后续客户端。** 一期重构服务端或共享契约以兼容未来桌面/移动端即可，不创建占位业务代码。
@@ -247,3 +247,5 @@ backend/server/src/
 ## 当前下一步
 
 public 实时消息与附件已经完成并提交。下一步进入管理能力：补齐审计日志、消息软删除、存储概况和孤立附件清理，再完善已读位置。
+
+Linux x64 npm 发布候选、生产 `8887/8888` 双端口服务和 `localshare` 生命周期 CLI 已实现；实际 npm registry 发布仍需要账号认证。

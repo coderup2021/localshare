@@ -4,10 +4,11 @@ import { expect, test, type Page } from '@playwright/test'
 const baseURL = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:7777'
 
 function lanBaseURL() {
+  const configured = new URL(baseURL)
   for (const addresses of Object.values(networkInterfaces())) {
     for (const address of addresses ?? []) {
       if (address.family === 'IPv4' && !address.internal) {
-        return `http://${address.address}:7777`
+        return `${configured.protocol}//${address.address}:${configured.port || '80'}`
       }
     }
   }

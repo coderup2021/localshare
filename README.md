@@ -35,6 +35,36 @@ Web 入口使用 `7777`，避开 Chromium 对 `6665–6669` 的不安全端口�
 首次运行前可从 `.env.example` 创建本地 `.env`。数据库和附件默认保存在仓库根目录
 `.data/`，该目录不会提交。
 
+## 生产安装与运行
+
+发布候选包为 `localshare-server`，平台运行时通过
+`localshare-server-linux-x64` 安装：
+
+```bash
+npm install -g localshare-server
+localshare start --data-dir /srv/localshare --ip 192.168.1.10
+localshare status
+localshare restart
+localshare stop
+```
+
+生产端口固定为 Web `8888`、API/WebSocket `8887`：
+
+- user-web：`http://<ip>:8888/`
+- admin-web：`http://<ip>:8888/admin/`
+- API/WS：`http://<ip>:8887/`
+
+首次启动会输出默认管理员 `localShare` 和密码 `12345678`；修改密码后，
+后续启动只显示用户名和“密码已自定义”。
+
+生成可安装 tarball：
+
+```bash
+bun run pack:server
+```
+
+当前发布物支持 Linux x64；不支持平台会明确失败。安装阶段不会启动服务或创建业务数据。
+
 ## 质量检查
 
 ```bash

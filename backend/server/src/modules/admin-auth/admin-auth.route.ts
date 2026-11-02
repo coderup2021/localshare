@@ -16,6 +16,7 @@ export const ADMIN_SESSION_COOKIE = 'localshare_admin_session'
 const SESSION_SECONDS = 7 * 24 * 60 * 60
 const LOGIN_ATTEMPT_LIMIT = 5
 const LOGIN_WINDOW_MS = 15 * 60 * 1_000
+const ALLOWED_WEB_PORTS = new Set(['', '7777', '8888'])
 
 type LoginAttempt = {
   failures: number
@@ -64,7 +65,7 @@ function rejectCrossOrigin(context: Context<RequestEnvironment>) {
     const requestUrl = new URL(context.req.url)
     const requestHostname = context.req.header('host')?.split(':')[0] ?? requestUrl.hostname
     if (
-      parsed.port === '7777' &&
+      ALLOWED_WEB_PORTS.has(parsed.port) &&
       parsed.hostname === requestHostname &&
       (parsed.protocol === 'http:' || parsed.protocol === 'https:')
     ) {

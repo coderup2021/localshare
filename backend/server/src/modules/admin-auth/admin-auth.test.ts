@@ -62,6 +62,19 @@ describe('admin authentication', () => {
     expect(setCookie).toContain('HttpOnly')
     expect(setCookie).toContain('SameSite=Lax')
 
+    const productionOriginLogin = await app.request('/api/v1/admin/auth/login', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        origin: 'http://localhost:8888',
+      },
+      body: JSON.stringify({
+        username: 'localShare',
+        password: DEFAULT_ADMIN_PASSWORD,
+      }),
+    })
+    expect(productionOriginLogin.status).toBe(200)
+
     const anonymousSession = await app.request('/api/v1/admin/auth/session')
     expect(anonymousSession.status).toBe(200)
     expect(await anonymousSession.json()).toEqual({ admin: null })

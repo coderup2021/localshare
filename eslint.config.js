@@ -12,6 +12,7 @@ export default tseslint.config(
       '**/coverage/**',
       '**/.codegraph/**',
       '**/.data/**',
+      '**/.release/**',
       'backend/server/drizzle/**',
     ],
   },
@@ -35,6 +36,14 @@ export default tseslint.config(
           fixStyle: 'inline-type-imports',
         },
       ],
+    },
+  },
+  {
+    files: ['backend/server/npm/bin/*.mjs'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+      },
     },
   },
   {

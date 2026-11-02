@@ -22,13 +22,13 @@ LocalShare 部署在局域网中的一台主机上，为局域网用户提供本
 ```text
 局域网浏览器
   │
-  └─ Web 入口 :7777
+  └─ Web 入口 :8888（生产）/ :7777（开发）
        ├─ /        → user-web 构建产物
        ├─ /admin/   → admin-web 构建产物
        └─ /api/*、/ws
               │ 反向代理
               ▼
-         Bun + Hono :5678
+         Bun + Hono :8887（生产）/ :5678（开发）
           ┌──────┴──────┐
           │             │
        SQLite       附件目录
@@ -37,12 +37,12 @@ LocalShare 部署在局域网中的一台主机上，为局域网用户提供本
 
 部署拓扑采用单节点：
 
-- 一个 Bun 服务进程，同时持有 `5678` API/WebSocket listener 和 `7777` Web/静态资源入口 listener。
+- 生产环境一个 Bun 服务进程同时持有 `8887` API/WebSocket listener 和 `8888` Web/静态资源入口 listener。
 - 一个 SQLite 数据库文件。
 - 一个受控的本地附件目录。
-- `7777` listener 承担静态资源和 API/WS 代理职责；TLS 终结层可以放在该入口之前，开启 HTTPS 后管理员 Cookie 启用 Secure。
+- `8888` listener 承担静态资源和浏览器侧 `/api`、`/ws` 路由职责；TLS 终结层可以放在该入口之前，开启 HTTPS 后管理员 Cookie 启用 Secure。
 
-`5678` 是服务端真实端口，`7777` 是浏览器唯一入口。浏览器请求 `/api/*` 和 `/ws` 时由 `7777` 入口转发到 `5678`，因此浏览器侧保持同源，管理端 Cookie 不跨域。开发和生产的端口一致。
+`8887` 是生产 API 真实端口，`8888` 是浏览器唯一入口。浏览器请求 `/api/*` 和 `/ws` 时由 `8888` listener 路由到同一进程的 API 应用，因此浏览器侧保持同源，管理端 Cookie 不跨域。开发环境继续使用 `5678/7777`。
 
 不在一期引入 Redis、消息队列、对象存储、SSR、微服务或独立业务实时网关。
 
@@ -69,19 +69,19 @@ docs/
 
 开发期：
 
-- server 固定监听 `5678`。
+- 开发 server 固定监听 `5678`，生产 server 固定监听 `8887`。
 - user-web 和 admin-web 分别构建，Vite 可运行在内部端口。
 - 根开发脚本在 `7777` 启动统一开发入口，将 `/` 转发给 user-web、`/admin/` 转发给 admin-web。
 - 统一入口把 `/api` 和 `/ws` 转发到 `5678`，避免开发环境跨域和管理员 Cookie 差异。
 
 生产期：
 
-- Hono 在 `5678` 暴露 `/api/*`、`/ws`，不要求直接向浏览器开放。
-- 端口 `7777` 的静态资源服务/反向代理托管 user-web 和 admin-web 构建产物，并代理 API/WebSocket。
-- user-web 使用 `/`，admin-web 使用 `/admin/`，两者共享 `7777` 入口。
+- Hono 在生产 `8887` 暴露 `/api/*`、`/ws`，不要求直接向浏览器开放。
+- 生产端口 `8888` 的静态资源服务托管 user-web 和 admin-web 构建产物，并处理 API/WebSocket 路由。
+- user-web 使用 `/`，admin-web 使用 `/admin/`，两者共享 `8888` 入口。
 - SPA 路由 fallback 不得吞掉 `/api` 和 `/ws`。
 - 附件使用独立的受控下载路由，不直接暴露磁盘目录。
-- npm 发布版把 API 监听、Web 入口和 CLI 进程管理收进同一个发行包；服务进程可以同时持有 `5678` 和 `7777` 两个 listener。
+- npm 发布版把 API 监听、Web 入口和 CLI 进程管理收进同一个发行包；生产服务进程同时持有 `8887` 和 `8888` 两个 listener。
 
 ## 4. 身份与会话
 
@@ -179,7 +179,7 @@ user-web 不做登录、注册和账户管理。所有打开 user-web 的访问�
 
 ## 6. WebSocket 协议
 
-连接地址：`/ws`，由 `7777` Web 入口代理到 `5678`。普通用户无需登录即可连接；若请求携带有效管理员会话 Cookie，则连接被标记为管理员连接，否则一律按匿名访客处理。
+连接地址：`/ws`，生产环境由 `8888` Web 入口路由到 `8887` API 应用。普通用户无需登录即可连接；若请求携带有效管理员会话 Cookie，则连接被标记为管理员连接，否则一律按匿名访客处理。
 
 统一 envelope：
 
@@ -310,7 +310,7 @@ user-web 不做登录、注册和账户管理。所有打开 user-web 的访问�
 - 服务进程由 npm CLI 管理启动、停止和重启；一期只保证单实例。可以选择外层 systemd/容器托管，但不能再启动第二个 CLI 实例。
 - 首次启动的数据目录和 IPv4 监听地址由 CLI 参数提供；之后 `stop`/`restart` 读取已保存的活动实例配置。
 - 运维配置优先由 CLI 持久化，环境变量只用于开发和容器内部覆盖；仓库只提交 `.env.example`。
-- `7777` 的 Web 入口对浏览器提供静态资源并代理 `/api`、`/ws` 到 `5678`。
+- 生产 `8888` 的 Web 入口对浏览器提供静态资源并处理 `/api`、`/ws` 到生产 `8887` API。
 - 反向代理设置合理的上传体积和 WebSocket upgrade 超时，并对 SPA fallback 排除 API/WS 路径。
 - 数据库、附件、日志、PID/锁文件和实例配置全部位于数据目录，不能位于 npm 全局安装目录。
 
@@ -344,10 +344,10 @@ LocalShare 的数据默认留在局域网主机，但“局域网”不是免鉴
 
 ### 14.1 发布物
 
-最终发布包（包名待确认，下称 LocalShare Server）必须能通过 `npm pack` 和 `npm publish` 发布到 npm 仓库，并允许第三方全局安装：
+最终发布主包名为 `localshare-server`，必须能通过 `npm pack` 和 `npm publish` 发布到 npm 仓库，并允许第三方全局安装：
 
 ```bash
-npm install -g <localshare-server-package>
+npm install -g localshare-server
 localshare --version
 ```
 
@@ -369,7 +369,7 @@ localshare --version
 
 ```text
 <data-dir>/
-  database.sqlite
+  localshare.sqlite
   uploads/
   logs/
   run/
@@ -399,7 +399,7 @@ localshare --version
 
 - `--data-dir` 和 `--ip` 必填；只接受 IPv4 字面量，拒绝主机名、IPv6、组播地址和未绑定到本机网卡的地址。
 - 建议拒绝 `0.0.0.0`，因为启动成功提示无法据此给出可访问的 Web 地址；推荐使用局域网网卡的具体 IPv4。
-- 两个服务端口都绑定指定 IPv4：API/WS 为 `5678`，Web 入口为 `7777`。
+- 两个生产服务端口都绑定指定 IPv4：API/WS 为 `8887`，Web 入口为 `8888`。
 - 启动前检查端口占用、数据目录权限、SQLite 文件可打开和 migration 状态。
 - 已有实例正在运行时，不启动第二个实例；提示使用 `restart` 或 `status`。
 - 子进程成功绑定端口并通过 `/api/v1/health/ready` 后才判定启动成功；启动失败时返回非零退出码并保留可诊断日志。
@@ -410,9 +410,9 @@ localshare --version
 
 ```text
 LocalShare started
-Web:   http://192.168.1.10:7777/
-Admin: http://192.168.1.10:7777/admin/
-API:   http://192.168.1.10:5678/api/v1
+Web:   http://192.168.1.10:8888/
+Admin: http://192.168.1.10:8888/admin/
+API:   http://192.168.1.10:8887/api/v1
 Admin username: localShare
 Admin password: 12345678
 Change the default password after first login.

@@ -5,6 +5,7 @@ playwright-report/
 test-results/
 .data/
 .e2e-data/
+.release/
 uploads/
 logs/
 .env

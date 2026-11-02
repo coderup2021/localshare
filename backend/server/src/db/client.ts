@@ -25,9 +25,9 @@ export function openDatabase(dataDir: string): DatabaseClient {
   }
 }
 
-export function initializeDatabase(dataDir: string): DatabaseClient {
+export function initializeDatabase(dataDir: string, migrationsDir?: string): DatabaseClient {
   const client = openDatabase(dataDir)
-  const migrationsFolder = new URL('../../drizzle', import.meta.url).pathname
+  const migrationsFolder = migrationsDir ?? new URL('../../drizzle', import.meta.url).pathname
 
   migrate(client.db, { migrationsFolder })
   return client

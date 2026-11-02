@@ -16,6 +16,8 @@ export function AdminDashboard() {
   const healthState = useServiceStore((service) => service.state)
   const healthError = useServiceStore((service) => service.error)
   const checkHealth = useServiceStore((service) => service.check)
+  const webPort = window.location.port || (window.location.protocol === 'https:' ? '443' : '80')
+  const apiPort = webPort === '8888' ? '8887' : '5678'
 
   useEffect(() => {
     void checkHealth()
@@ -73,10 +75,10 @@ export function AdminDashboard() {
 
           <div className="admin-metrics">
             <Card>
-              <Statistic title="API 端口" value={5678} />
+              <Statistic title="API 端口" value={apiPort} />
             </Card>
             <Card>
-              <Statistic title="Web 端口" value={7777} />
+              <Statistic title="Web 端口" value={webPort} />
             </Card>
             <Card>
               <Statistic title="管理员账户" value="localShare" />

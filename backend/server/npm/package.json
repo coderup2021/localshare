@@ -1,0 +1,21 @@
+{
+  "name": "localshare-server",
+  "version": "0.1.0",
+  "description": "LAN chat and file sharing service",
+  "license": "UNLICENSED",
+  "type": "module",
+  "bin": {
+    "localshare": "bin/localshare.mjs"
+  },
+  "files": [
+    "bin",
+    "resources",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "optionalDependencies": {
+    "localshare-server-linux-x64": "0.1.0"
+  }
+}
