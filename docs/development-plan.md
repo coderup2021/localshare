@@ -325,7 +325,7 @@ CodeGraph 是跨里程碑的强制开发工具：M0 完成仓库根目录初始�
 - 发布包包含服务端运行代码、Drizzle migration、user-web/admin-web 静态产物、CLI 和许可证。
 - npm tarball 不包含 `.codegraph/`、开发源码测试和本地索引数据。
 - 提供全局命令 `localshare`，首批支持 `start`、`stop`、`restart`、`status`。
-- `start` 必须接收 `--data-dir` 和本机 IPv4 地址 `--ip`，并用相同 IPv4 绑定生产 API `8887` 与 Web `8888`。
+- `start` 首次交互询问数据目录和 IPv4，默认 `~/.localshare` 与 `0.0.0.0`；参数可覆盖默认值，后续启动复用保存配置，`--reset` 可重新配置。
 - 数据目录保存 SQLite、附件、日志、PID/锁和实例配置；不得使用 npm 全局安装目录保存业务数据。
 - 后台启动、健康检查、端口冲突检测、PID/锁和失效状态清理。
 - 停止使用优雅信号并验证端口释放；重启复用已保存的数据目录和 IPv4。
@@ -341,19 +341,20 @@ CodeGraph 是跨里程碑的强制开发工具：M0 完成仓库根目录初始�
 
 1. 在干净构建环境执行 `npm pack`，检查 tarball 不包含源码测试、`.env`、SQLite、上传文件、日志或本地绝对路径。
 2. 从生成的 `.tgz` 全局安装，`localshare --version` 可用，安装过程没有启动服务。
-3. 在全新目录执行：
+3. 首次执行交互命令，确认默认值为 `~/.localshare` 和 `0.0.0.0`：
 
    ```bash
-   localshare start --data-dir /srv/localshare --ip 192.168.1.10
+   localshare start
    ```
 
 4. 命令仅在 `8887` API/WS 和 `8888` Web 均通过健康检查后报告成功，并打印两个可直接打开的地址；密码仍为默认值时同时打印管理员用户名和 `12345678`。
-5. 打开 `http://192.168.1.10:8888/` 能直接进入 public 频道并发送消息；打开管理地址能登录。
+5. 打开 CLI 输出的 `8888` 地址能直接进入 public 频道并发送消息；打开管理地址能登录。
 6. `localshare stop` 返回成功，PID 和两个端口均释放；重复 `stop` 不会误杀其他进程。
 7. `localshare restart` 使用保存的数据目录和 IPv4 恢复服务，历史消息、附件和已修改的管理员密码仍有效。
 8. `localshare status` 能区分未启动、运行中、状态文件损坏和进程异常退出。
 9. 端口冲突、非法 IPv4、非本机 IPv4、不可写数据目录、migration 失败均返回非零退出码和明确错误。
 10. 停止服务后安装新版本 npm 包，使用原数据目录重启，migration、消息、附件和管理员登录均正常。
+11. 再次 `start` 不重复询问；`restart --reset` 能重新交互指定数据目录和 IPv4。
 
 ### 9.3 发布候选实现结果
 

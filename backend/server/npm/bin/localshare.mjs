@@ -20,6 +20,7 @@ import { dirname, join, resolve } from 'node:path'
 import { createServer } from 'node:net'
 import { fileURLToPath } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
+import { createInterface } from 'node:readline/promises'
 
 const API_PORT = 8887
 const WEB_PORT = 8888
@@ -28,6 +29,7 @@ const packageJson = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))
 const require = createRequire(import.meta.url)
 const configDir = process.env.LOCALSHARE_CONFIG_DIR ?? join(homedir(), '.localshare')
 const currentInstanceFile = join(configDir, 'current.json')
+const defaultDataDir = join(homedir(), '.localshare')
 
 function fail(message) {
   throw new Error(message)
@@ -70,15 +72,27 @@ function localIPv4Addresses() {
 }
 
 function validateIPv4(value) {
+  if (value === '0.0.0.0') return
+
   const parts = value.split('.')
   const valid =
     parts.length === 4 &&
     parts.every((part) => /^\d{1,3}$/.test(part) && Number(part) >= 0 && Number(part) <= 255) &&
-    value !== '0.0.0.0'
+    value !== '255.255.255.255'
   if (!valid) fail(`Invalid IPv4 address: ${value}`)
   if (!localIPv4Addresses().includes(value)) {
     fail(`IPv4 address is not assigned to this machine: ${value}`)
   }
+}
+
+function probeHost(ip) {
+  return ip === '0.0.0.0' ? '127.0.0.1' : ip
+}
+
+function displayHost(ip) {
+  if (ip !== '0.0.0.0') return ip
+  const lanAddress = localIPv4Addresses().find((address) => !address.startsWith('127.'))
+  return lanAddress ?? '127.0.0.1'
 }
 
 function prepareDataDir(value) {
@@ -177,16 +191,17 @@ function binaryPath() {
 
 async function waitForHealth(instance, child, logPath) {
   const deadline = Date.now() + 20_000
+  const host = probeHost(instance.ip)
   while (Date.now() < deadline) {
     if (child.exitCode !== null) {
       throw new Error(`LocalShare exited during startup. See log: ${logPath}`)
     }
 
     try {
-      const api = await fetch(`http://${instance.ip}:${API_PORT}/api/v1/health/ready`, {
+      const api = await fetch(`http://${host}:${API_PORT}/api/v1/health/ready`, {
         signal: AbortSignal.timeout(1_500),
       })
-      const web = await fetch(`http://${instance.ip}:${WEB_PORT}/`, {
+      const web = await fetch(`http://${host}:${WEB_PORT}/`, {
         signal: AbortSignal.timeout(1_500),
       })
       if (api.ok && web.ok) return
@@ -199,10 +214,12 @@ async function waitForHealth(instance, child, logPath) {
 }
 
 function printStarted(instance, adminStatus) {
+  const host = displayHost(instance.ip)
   console.log('LocalShare started')
-  console.log(`Web:   http://${instance.ip}:${WEB_PORT}/`)
-  console.log(`Admin: http://${instance.ip}:${WEB_PORT}/admin/`)
-  console.log(`API:   http://${instance.ip}:${API_PORT}/api/v1`)
+  console.log(`Web:   http://${host}:${WEB_PORT}/`)
+  console.log(`Admin: http://${host}:${WEB_PORT}/admin/`)
+  console.log(`API:   http://${host}:${API_PORT}/api/v1`)
+  console.log(`Bind:  ${instance.ip}:${WEB_PORT} (Web), ${instance.ip}:${API_PORT} (API)`)
   console.log(`PID:   ${instance.pid}`)
   if (adminStatus?.mustChangePassword) {
     console.log(`Admin username: ${adminStatus.username}`)
@@ -331,13 +348,41 @@ async function stop(options = {}) {
   return instance
 }
 
-async function restart() {
+async function startCommand(args) {
+  const options = parseStartOptions(args)
   const current = readCurrentInstance()
-  if (!current) fail('No LocalShare instance is configured.')
-  const instance = readInstance(current.dataDir)
-  if (!instance) fail(`Instance configuration is missing in ${current.dataDir}`)
-  await stop({ quiet: true })
-  await start(instance.dataDir, instance.ip)
+  const saved = current ? readInstance(current.dataDir) : null
+
+  if (saved && processMatches(saved.pid)) {
+    if (options.reset) {
+      fail('LocalShare is running. Use "localshare restart --reset" to reconfigure it.')
+    }
+    fail(`LocalShare is already running (PID ${saved.pid}). Use status or restart.`)
+  }
+
+  const config = await resolveStartConfiguration(options)
+  await start(config.dataDir, config.ip)
+}
+
+async function restartCommand(args) {
+  const options = parseStartOptions(args)
+  const current = readCurrentInstance()
+  const saved = current ? readInstance(current.dataDir) : null
+
+  if (!options.reset) {
+    if (options.dataDir || options.ip) {
+      fail('Use "start --data-dir ... --ip ..." to choose a new configuration.')
+    }
+    if (!saved) fail('No LocalShare instance is configured. Use localshare start.')
+
+    if (processMatches(saved.pid)) await stop({ quiet: true })
+    await start(saved.dataDir, saved.ip)
+    return
+  }
+
+  if (saved && processMatches(saved.pid)) await stop({ quiet: true })
+  const config = await resolveStartConfiguration({ ...options, reset: true })
+  await start(config.dataDir, config.ip)
 }
 
 async function status() {
@@ -362,10 +407,14 @@ async function status() {
   }
 
   let health = 'unreachable'
+  const host = displayHost(instance.ip)
   try {
-    const response = await fetch(`http://${instance.ip}:${API_PORT}/api/v1/health/ready`, {
-      signal: AbortSignal.timeout(2_000),
-    })
+    const response = await fetch(
+      `http://${probeHost(instance.ip)}:${API_PORT}/api/v1/health/ready`,
+      {
+        signal: AbortSignal.timeout(2_000),
+      },
+    )
     health = response.ok ? 'ready' : `error ${response.status}`
   } catch {
     // Keep "unreachable" for diagnostics.
@@ -377,9 +426,9 @@ async function status() {
   console.log(`Version: ${instance.version}`)
   console.log(`Data:   ${instance.dataDir}`)
   console.log(`IP:     ${instance.ip}`)
-  console.log(`Web:    http://${instance.ip}:${WEB_PORT}/`)
-  console.log(`Admin:  http://${instance.ip}:${WEB_PORT}/admin/`)
-  console.log(`API:    http://${instance.ip}:${API_PORT}/api/v1`)
+  console.log(`Web:    http://${host}:${WEB_PORT}/`)
+  console.log(`Admin:  http://${host}:${WEB_PORT}/admin/`)
+  console.log(`API:    http://${host}:${API_PORT}/api/v1`)
 }
 
 function logs() {
@@ -395,32 +444,93 @@ function logs() {
 }
 
 function parseStartOptions(args) {
-  const values = new Map()
-  for (let index = 0; index < args.length; index += 2) {
+  const options = { reset: false }
+  for (let index = 0; index < args.length; index += 1) {
     const key = args[index]
-    const value = args[index + 1]
+    if (key === '--reset') {
+      options.reset = true
+      continue
+    }
     if (key !== '--data-dir' && key !== '--ip') fail(`Unknown option: ${key}`)
+
+    const value = args[index + 1]
     if (!value) fail(`Missing value for ${key}`)
-    values.set(key, value)
+    options[key === '--data-dir' ? 'dataDir' : 'ip'] = value
+    index += 1
   }
-  const dataDir = values.get('--data-dir')
-  const ip = values.get('--ip')
-  if (!dataDir || !ip) {
-    fail('Usage: localshare start --data-dir <absolute-directory> --ip <local-IPv4>')
+  return options
+}
+
+async function readlineQuestion(question) {
+  const readline = createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  })
+  try {
+    return await readline.question(question)
+  } finally {
+    readline.close()
   }
+}
+
+async function promptStartConfiguration(defaults) {
+  if (!process.stdin.isTTY) {
+    validateIPv4(defaults.ip)
+    return defaults
+  }
+
+  const dataDirAnswer = (await readlineQuestion(`Data directory [${defaults.dataDir}]: `)).trim()
+  const dataDir = dataDirAnswer || defaults.dataDir
+
+  let ip
+  while (true) {
+    const ipAnswer = (await readlineQuestion(`Listen IPv4 [${defaults.ip}]: `)).trim()
+    ip = ipAnswer || defaults.ip
+    try {
+      validateIPv4(ip)
+      break
+    } catch (error) {
+      console.error(error.message)
+    }
+  }
+
   return { dataDir, ip }
+}
+
+async function resolveStartConfiguration(options) {
+  const current = readCurrentInstance()
+  const saved = current ? readInstance(current.dataDir) : null
+
+  if (!options.reset && !options.dataDir && !options.ip && saved) {
+    return { dataDir: saved.dataDir, ip: saved.ip }
+  }
+
+  const defaults = {
+    dataDir: options.dataDir ?? saved?.dataDir ?? defaultDataDir,
+    ip: options.ip ?? saved?.ip ?? '0.0.0.0',
+  }
+  if (options.dataDir && options.ip) {
+    validateIPv4(defaults.ip)
+    return defaults
+  }
+
+  return promptStartConfiguration(defaults)
 }
 
 function help() {
   console.log(`LocalShare ${packageJson.version}
 
 Usage:
-  localshare start --data-dir <directory> --ip <local-IPv4>
+  localshare start [--data-dir <directory>] [--ip <IPv4>] [--reset]
   localshare stop
-  localshare restart
+  localshare restart [--reset]
   localshare status
   localshare logs
-  localshare --version`)
+  localshare --version
+
+Defaults:
+  data directory: ${defaultDataDir}
+  listen IPv4:    0.0.0.0 (all IPv4 interfaces)`)
 }
 
 async function main() {
@@ -434,12 +544,11 @@ async function main() {
     return
   }
   if (command === 'start') {
-    const options = parseStartOptions(args)
-    await start(options.dataDir, options.ip)
+    await startCommand(args)
     return
   }
   if (command === 'stop') return stop()
-  if (command === 'restart') return restart()
+  if (command === 'restart') return restartCommand(args)
   if (command === 'status') return status()
   if (command === 'logs') return logs()
   fail(`Unknown command: ${command}`)

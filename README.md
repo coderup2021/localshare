@@ -42,17 +42,36 @@ Web 入口使用 `7777`，避开 Chromium 对 `6665–6669` 的不安全端口�
 
 ```bash
 npm install -g localshare-server
-localshare start --data-dir /srv/localshare --ip 192.168.1.10
+localshare start
 localshare status
 localshare restart
 localshare stop
 ```
 
+首次 `start` 会依次询问数据目录和监听 IPv4：
+
+- 数据目录默认：用户家目录下的 `.localshare`
+- 监听 IPv4 默认：`0.0.0.0`，即监听所有 IPv4 网卡
+
+已有配置时再次 `start` 会直接复用上次配置。需要重新配置：
+
+```bash
+localshare restart --reset
+```
+
+自动化场景可一次性传参：
+
+```bash
+localshare start --data-dir /srv/localshare --ip 0.0.0.0
+```
+
 生产端口固定为 Web `8888`、API/WebSocket `8887`：
 
-- user-web：`http://<ip>:8888/`
-- admin-web：`http://<ip>:8888/admin/`
-- API/WS：`http://<ip>:8887/`
+- user-web：`http://<host>:8888/`
+- admin-web：`http://<host>:8888/admin/`
+- API/WS：`http://<host>:8887/`
+
+绑定 `0.0.0.0` 时，CLI 会输出本机可用的局域网 IPv4 地址。
 
 首次启动会输出默认管理员 `localShare` 和密码 `12345678`；修改密码后，
 后续启动只显示用户名和“密码已自定义”。

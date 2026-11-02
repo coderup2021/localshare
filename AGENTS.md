@@ -43,16 +43,23 @@ M0 工程基础、管理员认证、public 实时文本和附件纵切已完成�
 - 生产环境 HTTP API/WebSocket 使用 `8887`，统一 Web 入口使用 `8888`。
 - user-web 使用 `/`，admin-web 使用 `/admin/`。两个应用通过同一个 Web 入口访问，不分别占用对外端口。
 - 开发期内部 Vite 端口可以不同，但必须由根脚本通过 `7777` 统一代理；生产期由端口 `8888` 上的静态资源服务统一暴露，并将 `/api`、`/ws` 路由到同一服务进程的 `8887` API listener。
-- npm 发布版首次启动时必须通过命令行指定数据目录和本机 IPv4 地址；两个监听端口固定绑定到该 IPv4。
+- npm 发布版首次 `start` 通过交互方式依次询问数据目录和监听 IPv4；默认分别为用户家目录下的 `.localshare` 和 `0.0.0.0`。后续启动复用保存的配置，`--reset` 可重新配置。
 
 最终 npm 使用形态（包名在发布前确认）：
 
 ```bash
 npm install -g localshare-server
-localshare start --data-dir /srv/localshare --ip 192.168.1.10
+localshare start
 localshare stop
 localshare restart
 localshare status
+```
+
+自动化和服务部署也可以直接传参：
+
+```bash
+localshare start --data-dir /srv/localshare --ip 0.0.0.0
+localshare restart --reset
 ```
 
 `start` 在后台启动服务，等待健康检查成功后打印 Web、管理端和 API 地址。管理员仍使用默认密码时，同时显示用户名和默认密码；密码已修改后只显示用户名。`stop`、`restart` 使用已保存的活动实例信息；数据目录、日志、PID 或锁文件不得写入全局 npm 安装目录。
