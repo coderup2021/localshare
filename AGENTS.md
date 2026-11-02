@@ -11,18 +11,18 @@ LocalShare 是运行在本地局域网内的信息分享与即时通信软件。
 - 第一期：`server`、`user-web`、`admin-web`
 - 后续：`app-desktop`、`app-mobile`
 
-M0 工程基础已完成（2026-11-02）：仓库可启动 Bun API、user-web、admin-web，SQLite migration、健康检查、共享契约和统一开发入口均已验证。当前尚未实现管理员认证和消息业务。一期完成时，应能在一台局域网主机上部署：普通用户无需登录即可通过 user-web 进入公共频道、聊天和收发附件；管理员通过 admin-web 使用唯一账户 `localShare` 登录。最终产物还必须能从 npm 仓库安装，并通过命令行管理服务生命周期。
+M0 工程基础与 M1 管理员认证纵切已完成（2026-11-02）：仓库可启动 Bun API、user-web、admin-web；管理员可用 `localShare` 登录、保持会话、退出和修改密码。当前尚未实现匿名访客、public 消息与附件业务。一期完成时，应能在一台局域网主机上部署：普通用户无需登录即可通过 user-web 进入公共频道、聊天和收发附件；管理员通过 admin-web 使用唯一账户 `localShare` 登录。最终产物还必须能从 npm 仓库安装，并通过命令行管理服务生命周期。
 
 ## 当前目录
 
 | 路径                | 用途                                                        | 当前状态                                |
 | ------------------- | ----------------------------------------------------------- | --------------------------------------- |
-| `backend/server`    | Bun + Hono 服务、SQLite/Drizzle、CLI；最终打包为 npm 发布物 | M0 健康检查与数据库迁移可运行           |
+| `backend/server`    | Bun + Hono 服务、SQLite/Drizzle、CLI；最终打包为 npm 发布物 | 健康检查、数据库和管理员认证可运行      |
 | `backend/web-user`  | 用户 Web 客户端                                             | M0 壳与 API 状态检查可运行              |
-| `backend/web-admin` | 管理 Web 客户端                                             | M0 壳与 API 状态检查可运行              |
+| `backend/web-admin` | 管理 Web 客户端                                             | 登录、会话保持、退出和改密界面可运行    |
 | `app-desktop`       | 桌面客户端                                                  | 暂不开发                                |
 | `app-mobile`        | 移动客户端                                                  | 暂不开发                                |
-| `.codegraph/`       | CodeGraph 本地代码索引，不提交、不发布                      | 已初始化；28 个文件、171 个节点且已同步 |
+| `.codegraph/`       | CodeGraph 本地代码索引，不提交、不发布                      | 已初始化；41 个文件、333 个节点且已同步 |
 | `docs/`             | 架构、协议、路线图和决策记录                                | 初始化中                                |
 
 目录名是当前实际状态。若要调整工作区布局或重命名目录，必须先作为独立改动完成，并同步所有脚本和文档。
@@ -246,4 +246,4 @@ backend/server/src/
 
 ## 当前下一步
 
-从 [`docs/development-plan.md`](docs/development-plan.md) 的 M1 开始：实现唯一管理员 `localShare` 的身份表、管理会话、登录/注销/改密、默认管理员初始化，以及未认证访问保护。M0 的工程、数据库、端口代理和 CodeGraph 工作流均已完成。
+管理员认证功能已经完成并提交。下一步继续 M1：实现匿名访客 Cookie、唯一 public 会话初始化和审计日志，为公共消息与附件功能建立数据边界。

@@ -2,6 +2,62 @@ body {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
+  background: #f4f6f5;
+}
+
+.admin-loading {
+  display: flex;
+  min-height: 100vh;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: #5d6b63;
+}
+
+.login-shell {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 24px;
+  background: radial-gradient(circle at top left, rgb(36 116 79 / 14%), transparent 36%), #f4f6f5;
+}
+
+.login-card {
+  width: min(440px, 100%);
+  box-shadow: 0 28px 80px -44px rgb(20 60 38 / 48%);
+}
+
+.login-brand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.login-mark {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  border-radius: 16px;
+  background: #24744f;
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.login-title {
+  margin: 0 !important;
+}
+
+.login-help {
+  margin: 24px 0 !important;
+  line-height: 1.9;
+}
+
+.login-alert,
+.password-alert,
+.dashboard-alert {
+  margin-bottom: 16px;
 }
 
 .admin-layout {

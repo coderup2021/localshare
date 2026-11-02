@@ -38,13 +38,26 @@ test('user web loads and reaches the API through the unified entry', async ({ pa
   expect(browserErrors).toEqual([])
 })
 
-test('admin web loads through /admin and reaches the API', async ({ page }) => {
+test('admin logs in through /admin and reaches the API', async ({ page }) => {
   const browserErrors = collectBrowserErrors(page)
 
   await page.goto('/admin/')
-  await expect(page.getByText('LocalShare Admin')).toBeVisible()
+  await expect(page.getByRole('heading', { name: '管理员登录' })).toBeVisible()
+  await page.getByLabel('密码').fill('12345678')
+  await page.getByRole('button', { name: /登\s*录/ }).click()
+
   await expect(page.getByRole('heading', { name: '工程概览' })).toBeVisible()
   await expect(page.getByText('服务在线')).toBeVisible()
   await expect(page.getByText('管理员账户')).toBeVisible()
+
+  await page.reload()
+  await expect(page.getByRole('heading', { name: '工程概览' })).toBeVisible()
+
+  await page.getByRole('button', { name: '修改密码' }).click()
+  await expect(page.getByRole('dialog', { name: '修改管理员密码' })).toBeVisible()
+  await page.keyboard.press('Escape')
+
+  await page.getByRole('button', { name: /退\s*出\s*登\s*录/ }).click()
+  await expect(page.getByRole('heading', { name: '管理员登录' })).toBeVisible()
   expect(browserErrors).toEqual([])
 })

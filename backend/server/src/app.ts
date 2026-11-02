@@ -1,18 +1,18 @@
 import { apiErrorSchema, healthStatusSchema } from '@localshare/contracts'
 import { Hono } from 'hono'
 
+import { createAdminAuthRoutes } from './modules/admin-auth/admin-auth.route'
+import type { AdminAuthService } from './modules/admin-auth/admin-auth.service'
+import { HttpError } from './shared/http-error'
+import type { RequestEnvironment } from './shared/types'
+
 type AppDependencies = {
   isDatabaseReady: () => boolean
-}
-
-type AppEnvironment = {
-  Variables: {
-    requestId: string
-  }
+  adminAuth?: AdminAuthService
 }
 
 export function createApp(dependencies: AppDependencies) {
-  const app = new Hono<AppEnvironment>()
+  const app = new Hono<RequestEnvironment>()
 
   app.use('/api/*', async (context, next) => {
     const requestId = context.req.header('x-request-id') ?? crypto.randomUUID()
@@ -53,6 +53,10 @@ export function createApp(dependencies: AppDependencies) {
     return context.json(body, databaseReady ? 200 : 503)
   })
 
+  if (dependencies.adminAuth) {
+    app.route('/api/v1/admin/auth', createAdminAuthRoutes(dependencies.adminAuth))
+  }
+
   app.notFound((context) => {
     const body = apiErrorSchema.parse({
       error: {
@@ -66,12 +70,26 @@ export function createApp(dependencies: AppDependencies) {
   })
 
   app.onError((error, context) => {
+    const requestId = context.get('requestId') ?? crypto.randomUUID()
+
+    if (error instanceof HttpError) {
+      const body = apiErrorSchema.parse({
+        error: {
+          code: error.code,
+          message: error.message,
+          requestId,
+        },
+      })
+
+      return context.json(body, error.status)
+    }
+
     console.error(error)
     const body = apiErrorSchema.parse({
       error: {
         code: 'INTERNAL_ERROR',
         message: 'An unexpected error occurred',
-        requestId: context.get('requestId') ?? crypto.randomUUID(),
+        requestId,
       },
     })
 

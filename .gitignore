@@ -4,6 +4,7 @@ coverage/
 playwright-report/
 test-results/
 .data/
+.e2e-data/
 uploads/
 logs/
 .env

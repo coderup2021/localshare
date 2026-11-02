@@ -140,6 +140,26 @@ CodeGraph 是跨里程碑的强制开发工具：M0 完成仓库根目录初始�
 - 清除匿名访客 Cookie 后仍可继续只读、发消息，但会获得新的匿名访客标识。
 - 不存在注册、普通用户账户、禁用用户、角色切换 API。
 
+### 4.3 已完成：管理员认证纵切
+
+已实现：
+
+- `admin_accounts`、`admin_sessions` 和第二个 Drizzle migration。
+- 首次启动幂等创建唯一管理员 `localShare`，初始密码 `12345678`，密码以 Argon2id 哈希保存。
+- 随机令牌 + SHA-256 哈希存储的 7 天管理员会话，Cookie 使用 `HttpOnly`、`SameSite=Lax` 和 `Path=/`。
+- `login`、`session`、`me`、`logout`、`password` API，统一错误 envelope 和 `Cache-Control: no-store`。
+- 修改密码后管理员 `mustChangePassword=false`，旧密码失效，该账户全部旧会话撤销。
+- Origin/Host 校验、登录失败记录、15 分钟窗口最多 5 次失败。
+- admin-web 登录、会话恢复、刷新保持、退出、修改密码表单和默认密码提醒。
+- 认证集成测试覆盖默认管理员、匿名会话、登录、保护接口、改密、会话撤销、不同 Origin 和限流。
+- Chrome E2E 覆盖管理端登录、刷新后会话保持、打开改密对话框和退出；E2E 使用独立 `.e2e-data/`。
+
+仍属于 M1、尚未实现：
+
+- 匿名访客 Cookie 和 `/public/bootstrap`。
+- 唯一 public 会话初始化。
+- `audit_logs` 与审计写入。
+
 ## 5. M2 user-web 公共频道与文本消息
 
 ### 5.1 交付
@@ -347,4 +367,4 @@ CodeGraph 是跨里程碑的强制开发工具：M0 完成仓库根目录初始�
 
 ## 14. 当前行动
 
-M0 已完成并验证。下一步进入 M1：先定义 `admin_account`、`admin_sessions` 和 `anonymous_visitors` schema，再实现 `localShare` 初始化、密码哈希、HttpOnly 管理会话、登录/注销/改密与未认证保护，最后接入 admin-web 登录页。
+M0 与管理员认证纵切均已完成并验证。下一步继续 M1：定义匿名访客和唯一 public 会话 schema，实现 bootstrap 与审计日志，为公共消息和附件功能建立完整数据边界。

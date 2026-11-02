@@ -1,6 +1,12 @@
 import { describe, expect, test } from 'bun:test'
 
-import { apiErrorSchema, healthStatusSchema } from './index'
+import {
+  ADMIN_USERNAME,
+  adminPasswordChangeRequestSchema,
+  adminLoginRequestSchema,
+  apiErrorSchema,
+  healthStatusSchema,
+} from './index'
 
 describe('API contracts', () => {
   test('accepts a healthy response', () => {
@@ -24,5 +30,23 @@ describe('API contracts', () => {
     })
 
     expect(parsed.error.code).toBe('ADMIN_UNAUTHORIZED')
+  })
+
+  test('accepts the only supported admin login', () => {
+    expect(
+      adminLoginRequestSchema.parse({
+        username: ADMIN_USERNAME,
+        password: '12345678',
+      }),
+    ).toEqual({ username: 'localShare', password: '12345678' })
+  })
+
+  test('rejects short passwords when changing credentials', () => {
+    expect(
+      adminPasswordChangeRequestSchema.safeParse({
+        currentPassword: '12345678',
+        newPassword: 'short',
+      }).success,
+    ).toBe(false)
   })
 })

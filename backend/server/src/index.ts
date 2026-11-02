@@ -1,11 +1,16 @@
 import { createApp } from './app'
 import { API_PORT, loadConfig } from './config/env'
+import { ensureDefaultAdmin } from './db/bootstrap'
 import { initializeDatabase, isDatabaseReady } from './db/client'
+import { AdminAuthService } from './modules/admin-auth/admin-auth.service'
 
 const config = loadConfig()
 const database = initializeDatabase(config.dataDir)
+await ensureDefaultAdmin(database)
+const adminAuth = new AdminAuthService(database)
 const app = createApp({
   isDatabaseReady: () => isDatabaseReady(database),
+  adminAuth,
 })
 
 const server = Bun.serve({
