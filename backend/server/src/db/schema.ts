@@ -48,6 +48,20 @@ export const conversations = sqliteTable(
   (table) => [uniqueIndex('conversations_slug_unique').on(table.slug)],
 )
 
+export const attachments = sqliteTable('attachments', {
+  id: text('id').primaryKey(),
+  uploaderType: text('uploader_type').notNull(),
+  uploaderId: text('uploader_id').notNull(),
+  storageKey: text('storage_key').notNull().unique(),
+  originalName: text('original_name').notNull(),
+  mimeType: text('mime_type').notNull(),
+  sizeBytes: integer('size_bytes', { mode: 'number' }).notNull(),
+  sha256: text('sha256').notNull(),
+  kind: text('kind').notNull(),
+  status: text('status').notNull().default('pending'),
+  createdAt: integer('created_at', { mode: 'number' }).notNull(),
+})
+
 export const messages = sqliteTable(
   'messages',
   {
@@ -62,6 +76,9 @@ export const messages = sqliteTable(
     kind: text('kind').notNull(),
     text: text('text').notNull(),
     clientRequestId: text('client_request_id').notNull(),
+    attachmentId: text('attachment_id').references(() => attachments.id, {
+      onDelete: 'set null',
+    }),
     createdAt: integer('created_at', { mode: 'number' }).notNull(),
     deletedAt: integer('deleted_at', { mode: 'number' }),
   },

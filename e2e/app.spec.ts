@@ -57,6 +57,43 @@ test('user message is visible to another anonymous browser', async ({ browser, p
   await expect(secondPage.locator('article').filter({ hasText: message })).toBeVisible({
     timeout: 5_000,
   })
+
+  const attachmentName = `e2e-${Date.now()}.txt`
+  await page.getByLabel('选择附件').setInputFiles({
+    name: attachmentName,
+    mimeType: 'text/plain',
+    buffer: Buffer.from('LocalShare attachment E2E'),
+  })
+  await expect(page.getByText(`已选择：${attachmentName}`)).toBeVisible()
+  await page.getByRole('button', { name: '发送文件' }).click()
+
+  const attachmentArticle = page.locator('article').filter({ hasText: attachmentName })
+  await expect(attachmentArticle).toBeVisible()
+  await expect(secondPage.locator('article').filter({ hasText: attachmentName })).toBeVisible({
+    timeout: 5_000,
+  })
+
+  const attachmentURL = await attachmentArticle.getByRole('link').getAttribute('href')
+  expect(attachmentURL).toBeTruthy()
+  const attachmentResponse = await page.request.get(attachmentURL ?? '')
+  expect(attachmentResponse.status()).toBe(200)
+  expect(await attachmentResponse.text()).toBe('LocalShare attachment E2E')
+
+  const imageName = `pixel-${Date.now()}.png`
+  await page.getByLabel('选择附件').setInputFiles({
+    name: imageName,
+    mimeType: 'image/png',
+    buffer: Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2nH0AAAAASUVORK5CYII=',
+      'base64',
+    ),
+  })
+  await page.getByRole('button', { name: '发送文件' }).click()
+  await expect(page.getByRole('img', { name: imageName })).toBeVisible()
+  await expect(secondPage.getByRole('img', { name: imageName })).toBeVisible({
+    timeout: 5_000,
+  })
+
   expect(secondBrowserErrors).toEqual([])
   await secondContext.close()
 

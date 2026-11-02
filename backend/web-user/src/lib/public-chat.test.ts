@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { createClientRequestId, messageTime } from './public-chat'
+import { createClientRequestId, formatBytes, messageTime } from './public-chat'
 
 describe('public chat presentation', () => {
   test('formats message timestamps without seconds', () => {
@@ -11,5 +11,10 @@ describe('public chat presentation', () => {
     expect(createClientRequestId()).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
     )
+  })
+
+  test('formats attachment sizes', () => {
+    expect(formatBytes(512)).toBe('512 B')
+    expect(formatBytes(2 * 1024 * 1024)).toBe('2.0 MB')
   })
 })

@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { createApp } from '../../app'
 import { ensurePublicConversation } from '../../db/bootstrap'
 import { initializeDatabase, type DatabaseClient } from '../../db/client'
+import { AttachmentService } from './attachment.service'
 import { PublicChatService } from './public-chat.service'
 
 let database: DatabaseClient
@@ -38,9 +39,11 @@ describe('public chat', () => {
     dataDir = mkdtempSync(join(tmpdir(), 'localshare-public-'))
     database = initializeDatabase(dataDir)
     await ensurePublicConversation(database)
+    const attachments = new AttachmentService(database, dataDir)
     app = createApp({
       isDatabaseReady: () => true,
-      publicChat: new PublicChatService(database),
+      publicChat: new PublicChatService(database, attachments),
+      attachments,
     })
   })
 
@@ -166,5 +169,90 @@ describe('public chat', () => {
       text: 'remote write',
       senderType: 'visitor',
     })
+  })
+
+  test('uploads, attaches, downloads, and ranges an attachment', async () => {
+    const visitor = await bootstrapVisitor()
+
+    const uploaded = await app.request('/api/v1/public/uploads', {
+      method: 'POST',
+      headers: {
+        cookie: visitor.cookie,
+        'content-type': 'text/plain',
+        'x-file-name': encodeURIComponent('sample.txt'),
+      },
+      body: '0123456789',
+    })
+    expect(uploaded.status).toBe(201)
+    const attachment = (await uploaded.json()) as {
+      id: string
+      name: string
+      kind: string
+      url: string
+    }
+    expect(attachment).toMatchObject({
+      name: 'sample.txt',
+      kind: 'file',
+    })
+
+    const sent = await app.request('/api/v1/public/messages', {
+      method: 'POST',
+      headers: {
+        cookie: visitor.cookie,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        text: '附件说明',
+        attachmentId: attachment.id,
+        clientRequestId: crypto.randomUUID(),
+      }),
+    })
+    expect(sent.status).toBe(201)
+    expect(await sent.json()).toMatchObject({
+      kind: 'file',
+      text: '附件说明',
+      attachment: {
+        id: attachment.id,
+        name: 'sample.txt',
+      },
+    })
+
+    const downloaded = await app.request(attachment.url)
+    expect(downloaded.status).toBe(200)
+    expect(downloaded.headers.get('content-disposition')).toContain('attachment')
+    expect(await downloaded.text()).toBe('0123456789')
+
+    const ranged = await app.request(attachment.url, {
+      headers: { range: 'bytes=2-5' },
+    })
+    expect(ranged.status).toBe(206)
+    expect(ranged.headers.get('content-range')).toBe('bytes 2-5/10')
+    expect(await ranged.text()).toBe('2345')
+  })
+
+  test('classifies inline images and videos by MIME type', async () => {
+    const visitor = await bootstrapVisitor()
+
+    for (const [name, mimeType, expectedKind] of [
+      ['pixel.png', 'image/png', 'image'],
+      ['clip.mp4', 'video/mp4', 'video'],
+      ['unsafe.svg', 'image/svg+xml', 'file'],
+    ] as const) {
+      const uploaded = await app.request('/api/v1/public/uploads', {
+        method: 'POST',
+        headers: {
+          cookie: visitor.cookie,
+          'content-type': mimeType,
+          'x-file-name': encodeURIComponent(name),
+        },
+        body: 'fixture-bytes',
+      })
+      expect(uploaded.status).toBe(201)
+      expect(await uploaded.json()).toMatchObject({
+        name,
+        mimeType,
+        kind: expectedKind,
+      })
+    }
   })
 })

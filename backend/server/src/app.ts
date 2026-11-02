@@ -6,6 +6,7 @@ import { createAdminAuthRoutes } from './modules/admin-auth/admin-auth.route'
 import type { AdminAuthService } from './modules/admin-auth/admin-auth.service'
 import { createPublicChatRoutes } from './modules/public-chat/public-chat.route'
 import type { PublicChatService } from './modules/public-chat/public-chat.service'
+import type { AttachmentService } from './modules/public-chat/attachment.service'
 import type { PublicChatHub } from './realtime/public-chat-hub'
 import { HttpError } from './shared/http-error'
 import type { RequestEnvironment } from './shared/types'
@@ -15,6 +16,7 @@ type AppDependencies = {
   adminAuth?: AdminAuthService
   publicChat?: PublicChatService
   publicChatHub?: PublicChatHub
+  attachments?: AttachmentService
 }
 
 export function createApp(dependencies: AppDependencies) {
@@ -66,7 +68,11 @@ export function createApp(dependencies: AppDependencies) {
   if (dependencies.publicChat) {
     app.route(
       '/api/v1/public',
-      createPublicChatRoutes(dependencies.publicChat, dependencies.publicChatHub),
+      createPublicChatRoutes(
+        dependencies.publicChat,
+        dependencies.publicChatHub,
+        dependencies.attachments,
+      ),
     )
   }
 

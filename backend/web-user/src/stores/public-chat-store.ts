@@ -9,8 +9,10 @@ import { create } from 'zustand'
 import {
   PublicChatError,
   bootstrapPublicChat,
+  createClientRequestId,
   fetchPublicMessages,
   sendPublicMessage,
+  uploadPublicAttachment,
 } from '../lib/public-chat'
 
 type PublicChatState = {
@@ -24,12 +26,15 @@ type PublicChatState = {
   loadingOlder: boolean
   refreshing: boolean
   sending: boolean
+  uploading: boolean
+  uploadProgress: number
   realtimeConnected: boolean
   error: string | null
   initialize: () => Promise<void>
   refresh: () => Promise<void>
   loadOlder: () => Promise<void>
   send: (request: CreatePublicMessageRequest) => Promise<boolean>
+  sendAttachment: (file: File, text: string) => Promise<boolean>
   receiveMessage: (message: PublicMessage) => void
   setRealtimeConnected: (connected: boolean) => void
 }
@@ -50,6 +55,8 @@ export const usePublicChatStore = create<PublicChatState>((set, get) => ({
   loadingOlder: false,
   refreshing: false,
   sending: false,
+  uploading: false,
+  uploadProgress: 0,
   realtimeConnected: false,
   error: null,
   initialize: async () => {
@@ -139,6 +146,40 @@ export const usePublicChatStore = create<PublicChatState>((set, get) => ({
       return true
     } catch (error) {
       set({ sending: false, error: messageFromError(error) })
+      return false
+    }
+  },
+  sendAttachment: async (file, text) => {
+    const state = get()
+    if (state.sending || state.uploading) return false
+
+    set({ uploading: true, uploadProgress: 0, error: null })
+    try {
+      const attachment = await uploadPublicAttachment(file, (percent) =>
+        set({ uploadProgress: percent }),
+      )
+      const message = await sendPublicMessage({
+        text,
+        attachmentId: attachment.id,
+        clientRequestId: createClientRequestId(),
+      })
+      const nextMessages = get()
+        .messages.filter((existing) => existing.id !== message.id)
+        .concat(message)
+        .sort((left, right) => left.seq - right.seq)
+
+      set({
+        messages: nextMessages,
+        uploading: false,
+        uploadProgress: 100,
+      })
+      return true
+    } catch (error) {
+      set({
+        uploading: false,
+        uploadProgress: 0,
+        error: messageFromError(error),
+      })
       return false
     }
   },

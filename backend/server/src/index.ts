@@ -4,6 +4,7 @@ import { ensureDefaultAdmin, ensurePublicConversation } from './db/bootstrap'
 import { initializeDatabase, isDatabaseReady } from './db/client'
 import { AdminAuthService } from './modules/admin-auth/admin-auth.service'
 import { PublicChatService } from './modules/public-chat/public-chat.service'
+import { AttachmentService } from './modules/public-chat/attachment.service'
 import { PublicChatHub } from './realtime/public-chat-hub'
 import { websocket } from 'hono/bun'
 
@@ -12,13 +13,15 @@ const database = initializeDatabase(config.dataDir)
 await ensureDefaultAdmin(database)
 await ensurePublicConversation(database)
 const adminAuth = new AdminAuthService(database)
-const publicChat = new PublicChatService(database)
+const attachments = new AttachmentService(database, config.dataDir)
+const publicChat = new PublicChatService(database, attachments)
 const publicChatHub = new PublicChatHub()
 const app = createApp({
   isDatabaseReady: () => isDatabaseReady(database),
   adminAuth,
   publicChat,
   publicChatHub,
+  attachments,
 })
 
 const server = Bun.serve({

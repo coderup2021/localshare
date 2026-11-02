@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 
 import { Button } from './components/ui/button'
 import { describeHealth } from './lib/health'
-import { createClientRequestId, messageTime } from './lib/public-chat'
+import { createClientRequestId, formatBytes, messageTime } from './lib/public-chat'
 import { connectPublicRealtime } from './lib/public-realtime'
 import { usePublicChatStore } from './stores/public-chat-store'
 import { useServiceStore } from './stores/service-store'
@@ -11,6 +11,7 @@ import { useServiceStore } from './stores/service-store'
 export function App() {
   const [draft, setDraft] = useState('')
   const [draftError, setDraftError] = useState<string | null>(null)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const messageEndRef = useRef<HTMLDivElement>(null)
   const lastMessageSeqRef = useRef(0)
 
@@ -26,12 +27,15 @@ export function App() {
   const loadingOlder = usePublicChatStore((state) => state.loadingOlder)
   const refreshing = usePublicChatStore((state) => state.refreshing)
   const sending = usePublicChatStore((state) => state.sending)
+  const uploading = usePublicChatStore((state) => state.uploading)
+  const uploadProgress = usePublicChatStore((state) => state.uploadProgress)
   const realtimeConnected = usePublicChatStore((state) => state.realtimeConnected)
   const chatError = usePublicChatStore((state) => state.error)
   const initializeChat = usePublicChatStore((state) => state.initialize)
   const refreshChat = usePublicChatStore((state) => state.refresh)
   const loadOlder = usePublicChatStore((state) => state.loadOlder)
   const sendMessage = usePublicChatStore((state) => state.send)
+  const sendAttachment = usePublicChatStore((state) => state.sendAttachment)
   const receiveMessage = usePublicChatStore((state) => state.receiveMessage)
   const setRealtimeConnected = usePublicChatStore((state) => state.setRealtimeConnected)
 
@@ -68,6 +72,22 @@ export function App() {
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+
+    if (selectedFile) {
+      if (draft.length > 2_000) {
+        setDraftError('消息说明不能超过 2000 个字符')
+        return
+      }
+
+      setDraftError(null)
+      const sent = await sendAttachment(selectedFile, draft.trim())
+      if (sent) {
+        setDraft('')
+        setSelectedFile(null)
+      }
+      return
+    }
+
     const parsed = createPublicMessageRequestSchema.safeParse({
       text: draft,
       clientRequestId: createClientRequestId(),
@@ -182,9 +202,39 @@ export function App() {
                         <span>{message.senderName}</span>
                         <time dateTime={message.createdAt}>{messageTime(message.createdAt)}</time>
                       </div>
-                      <p className="whitespace-pre-wrap break-words text-sm leading-6">
-                        {message.text}
-                      </p>
+                      {message.attachment?.kind === 'image' ? (
+                        <img
+                          src={message.attachment.url}
+                          alt={message.attachment.name}
+                          loading="lazy"
+                          className="mb-2 max-h-80 w-full rounded-xl object-contain"
+                        />
+                      ) : null}
+                      {message.attachment?.kind === 'video' ? (
+                        <video
+                          src={message.attachment.url}
+                          controls
+                          preload="metadata"
+                          className="mb-2 max-h-80 w-full rounded-xl bg-black"
+                        />
+                      ) : null}
+                      {message.attachment?.kind === 'file' ? (
+                        <a
+                          href={message.attachment.url}
+                          download={message.attachment.name}
+                          className="mb-2 flex items-center justify-between gap-4 rounded-xl border border-current/15 px-3 py-2 text-sm"
+                        >
+                          <span className="truncate">{message.attachment.name}</span>
+                          <span className="shrink-0 text-xs opacity-70">
+                            {formatBytes(message.attachment.sizeBytes)}
+                          </span>
+                        </a>
+                      ) : null}
+                      {message.text ? (
+                        <p className="whitespace-pre-wrap break-words text-sm leading-6">
+                          {message.text}
+                        </p>
+                      ) : null}
                     </div>
                   </article>
                 )
@@ -223,10 +273,52 @@ export function App() {
                 maxLength={2_000}
                 className="min-h-12 flex-1 resize-none rounded-xl border border-border bg-background px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
               />
-              <Button type="submit" disabled={sending || loading || !visitor} className="h-12 px-5">
-                {sending ? '发送中…' : '发送'}
+              <div className="flex flex-col gap-1">
+                <input
+                  id="attachment-input"
+                  aria-label="选择附件"
+                  type="file"
+                  className="sr-only"
+                  onChange={(event) => {
+                    setSelectedFile(event.target.files?.[0] ?? null)
+                    setDraftError(null)
+                  }}
+                />
+                <label
+                  htmlFor="attachment-input"
+                  className="cursor-pointer rounded-lg px-3 py-1 text-center text-xs text-muted-foreground hover:bg-muted"
+                >
+                  {selectedFile ? '更换附件' : '选择附件'}
+                </label>
+                {selectedFile ? (
+                  <button
+                    type="button"
+                    className="px-3 text-center text-xs text-red-600"
+                    onClick={() => setSelectedFile(null)}
+                  >
+                    移除
+                  </button>
+                ) : null}
+              </div>
+              <Button
+                type="submit"
+                disabled={sending || uploading || loading || !visitor}
+                className="h-12 px-5"
+              >
+                {uploading
+                  ? `上传 ${uploadProgress}%`
+                  : sending
+                    ? '发送中…'
+                    : selectedFile
+                      ? '发送文件'
+                      : '发送'}
               </Button>
             </div>
+            {selectedFile ? (
+              <p className="mt-2 text-xs text-muted-foreground">
+                已选择：{selectedFile.name} · {formatBytes(selectedFile.size)}
+              </p>
+            ) : null}
           </form>
         </div>
       </section>

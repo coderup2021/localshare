@@ -1,9 +1,11 @@
 import {
   type CreatePublicMessageRequest,
+  type PublicAttachment,
   type PublicBootstrapResponse,
   type PublicMessage,
   type PublicMessageListResponse,
   publicBootstrapResponseSchema,
+  publicAttachmentSchema,
   publicMessageListResponseSchema,
   publicMessageSchema,
 } from '@localshare/contracts'
@@ -70,6 +72,29 @@ export async function sendPublicMessage(
   }
 }
 
+export async function uploadPublicAttachment(
+  file: File,
+  onProgress?: (percent: number) => void,
+): Promise<PublicAttachment> {
+  try {
+    const response = await api.post('/api/v1/public/uploads', file, {
+      timeout: 120_000,
+      headers: {
+        'content-type': file.type || 'application/octet-stream',
+        'x-file-name': encodeURIComponent(file.name),
+      },
+      onUploadProgress(event) {
+        if (event.total) {
+          onProgress?.(Math.round((event.loaded / event.total) * 100))
+        }
+      },
+    })
+    return publicAttachmentSchema.parse(response.data)
+  } catch (error) {
+    throw normalizeError(error)
+  }
+}
+
 export function createClientRequestId(): string {
   if (typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID()
@@ -98,4 +123,10 @@ export function messageTime(isoTimestamp: string): string {
     hour: '2-digit',
     minute: '2-digit',
   }).format(new Date(isoTimestamp))
+}
+
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }

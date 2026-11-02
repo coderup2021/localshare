@@ -93,8 +93,18 @@ export const publicMessageSchema = z.object({
   senderType: z.enum(['visitor', 'admin']),
   senderId: z.string().min(1),
   senderName: z.string().min(1),
-  kind: z.literal('text'),
+  kind: z.enum(['text', 'image', 'video', 'file']),
   text: z.string(),
+  attachment: z
+    .object({
+      id: z.string().min(1),
+      name: z.string().min(1),
+      mimeType: z.string().min(1),
+      sizeBytes: z.number().int().nonnegative(),
+      kind: z.enum(['image', 'video', 'file']),
+      url: z.string().min(1),
+    })
+    .optional(),
   createdAt: z.iso.datetime(),
 })
 
@@ -108,12 +118,34 @@ export const publicMessageListResponseSchema = z.object({
 
 export type PublicMessageListResponse = z.infer<typeof publicMessageListResponseSchema>
 
-export const createPublicMessageRequestSchema = z.object({
-  text: z.string().trim().min(1).max(2_000),
-  clientRequestId: z.uuid(),
-})
+export const createPublicMessageRequestSchema = z
+  .object({
+    text: z.string().trim().max(2_000).default(''),
+    attachmentId: z.uuid().optional(),
+    clientRequestId: z.uuid(),
+  })
+  .superRefine((value, context) => {
+    if (!value.attachmentId && value.text.length === 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'A message requires text or an attachment',
+        path: ['text'],
+      })
+    }
+  })
 
 export type CreatePublicMessageRequest = z.infer<typeof createPublicMessageRequestSchema>
+
+export const publicAttachmentSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  mimeType: z.string().min(1),
+  sizeBytes: z.number().int().nonnegative(),
+  kind: z.enum(['image', 'video', 'file']),
+  url: z.string().min(1),
+})
+
+export type PublicAttachment = z.infer<typeof publicAttachmentSchema>
 
 export const publicRealtimeEventSchema = z.discriminatedUnion('type', [
   z.object({

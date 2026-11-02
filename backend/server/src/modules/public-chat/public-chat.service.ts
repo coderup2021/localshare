@@ -9,8 +9,9 @@ import { and, desc, eq, lt } from 'drizzle-orm'
 
 import { ensurePublicConversation } from '../../db/bootstrap'
 import type { DatabaseClient } from '../../db/client'
-import { anonymousVisitors, conversations, messages } from '../../db/schema'
+import { anonymousVisitors, attachments, conversations, messages } from '../../db/schema'
 import { HttpError } from '../../shared/http-error'
+import type { AttachmentService } from './attachment.service'
 
 function createVisitorId() {
   return crypto.randomUUID()
@@ -20,21 +21,28 @@ function displayNameForVisitor(id: string) {
   return `访客-${id.replaceAll('-', '').slice(0, 4).toUpperCase()}`
 }
 
-function toPublicMessage(row: typeof messages.$inferSelect): PublicMessage {
+function toPublicMessage(
+  row: typeof messages.$inferSelect,
+  attachment?: ReturnType<AttachmentService['toPublicAttachment']>,
+): PublicMessage {
   return {
     id: row.id,
     seq: row.seq,
     senderType: row.senderType === 'admin' ? 'admin' : 'visitor',
     senderId: row.senderId,
     senderName: row.senderName,
-    kind: 'text',
+    kind: row.kind === 'image' || row.kind === 'video' || row.kind === 'file' ? row.kind : 'text',
     text: row.text,
+    ...(attachment ? { attachment } : {}),
     createdAt: new Date(row.createdAt).toISOString(),
   }
 }
 
 export class PublicChatService {
-  constructor(private readonly client: DatabaseClient) {}
+  constructor(
+    private readonly client: DatabaseClient,
+    private readonly attachments?: AttachmentService,
+  ) {}
 
   async bootstrap(existingVisitorId: string | undefined): Promise<PublicBootstrapResponse> {
     await ensurePublicConversation(this.client)
@@ -107,9 +115,23 @@ export class PublicChatService {
 
     const hasMore = rows.length > limit
     const page = rows.slice(0, limit).reverse()
+    const attachmentIds = page
+      .map((row) => row.attachmentId)
+      .filter((id): id is string => Boolean(id))
+    const attachmentMap = this.attachments
+      ? await this.attachments.findByIds(attachmentIds)
+      : new Map()
 
     return {
-      messages: page.map(toPublicMessage),
+      messages: page.map((row) => {
+        const attachmentRow = row.attachmentId ? attachmentMap.get(row.attachmentId) : undefined
+        return toPublicMessage(
+          row,
+          attachmentRow && this.attachments
+            ? this.attachments.toPublicAttachment(attachmentRow)
+            : undefined,
+        )
+      }),
       hasMore,
       nextBeforeSeq: hasMore && page[0] ? page[0].seq : null,
     }
@@ -145,10 +167,31 @@ export class PublicChatService {
       .then((rows) => rows[0])
 
     if (existing) {
+      const existingAttachment =
+        existing.attachmentId && this.attachments
+          ? (await this.attachments.findByIds([existing.attachmentId])).get(existing.attachmentId)
+          : undefined
       return {
-        message: toPublicMessage(existing),
+        message: toPublicMessage(
+          existing,
+          existingAttachment && this.attachments
+            ? this.attachments.toPublicAttachment(existingAttachment)
+            : undefined,
+        ),
         created: false,
       }
+    }
+
+    const attachment = request.attachmentId
+      ? await this.attachments?.pendingOwnedBy(visitor.id, request.attachmentId)
+      : undefined
+
+    if (request.attachmentId && !attachment) {
+      throw new HttpError(
+        'ATTACHMENT_NOT_AVAILABLE',
+        409,
+        'Attachment is missing or already attached to a message',
+      )
     }
 
     const message = await this.client.db.transaction(async (transaction) => {
@@ -168,17 +211,19 @@ export class PublicChatService {
       }
 
       const now = Date.now()
-      const row: typeof messages.$inferInsert = {
+      const row: typeof messages.$inferSelect = {
         id: crypto.randomUUID(),
         conversationId: conversation.id,
         seq: current.nextSeq,
         senderType: 'visitor',
         senderId: visitor.id,
         senderName: visitor.displayName,
-        kind: 'text',
+        kind: attachment?.kind ?? 'text',
         text: request.text,
         clientRequestId: request.clientRequestId,
+        attachmentId: attachment?.id ?? null,
         createdAt: now,
+        deletedAt: null,
       }
 
       await transaction
@@ -190,18 +235,23 @@ export class PublicChatService {
         .where(eq(conversations.id, conversation.id))
 
       await transaction.insert(messages).values(row)
-
-      return {
-        ...row,
-        id: row.id,
+      if (attachment) {
+        await transaction
+          .update(attachments)
+          .set({ status: 'attached' })
+          .where(eq(attachments.id, attachment.id))
       }
+
+      return row
     })
 
     return {
-      message: toPublicMessage({
-        ...message,
-        deletedAt: null,
-      }),
+      message: toPublicMessage(
+        message,
+        attachment && this.attachments
+          ? this.attachments.toPublicAttachment(attachment)
+          : undefined,
+      ),
       created: true,
     }
   }
