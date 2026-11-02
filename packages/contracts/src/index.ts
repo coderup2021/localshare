@@ -119,6 +119,13 @@ export const publicMessageListResponseSchema = z.object({
 
 export type PublicMessageListResponse = z.infer<typeof publicMessageListResponseSchema>
 
+export const publicMessageSearchResponseSchema = z.object({
+  query: z.string(),
+  messages: z.array(publicMessageSchema),
+})
+
+export type PublicMessageSearchResponse = z.infer<typeof publicMessageSearchResponseSchema>
+
 export const createPublicMessageRequestSchema = z
   .object({
     text: z.string().trim().max(2_000).default(''),

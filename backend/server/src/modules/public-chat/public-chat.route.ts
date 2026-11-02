@@ -3,6 +3,7 @@ import {
   publicAttachmentSchema,
   publicBootstrapResponseSchema,
   publicMessageListResponseSchema,
+  publicMessageSearchResponseSchema,
   publicMessageSchema,
 } from '@localshare/contracts'
 import { z } from 'zod'
@@ -23,6 +24,10 @@ const messageQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
 })
 const messageIdSchema = z.uuid()
+const messageSearchQuerySchema = z.object({
+  q: z.string().trim().min(1).max(200),
+  limit: z.coerce.number().int().min(1).max(50).default(30),
+})
 
 export function createPublicChatRoutes(
   service: PublicChatService,
@@ -62,6 +67,19 @@ export function createPublicChatRoutes(
 
     const response = await service.listMessages(parsed.data.beforeSeq, parsed.data.limit)
     return context.json(publicMessageListResponseSchema.parse(response))
+  })
+
+  routes.get('/search/messages', async (context) => {
+    const parsed = messageSearchQuerySchema.safeParse({
+      q: context.req.query('q'),
+      limit: context.req.query('limit'),
+    })
+    if (!parsed.success) {
+      throw new HttpError('INVALID_REQUEST', 400, 'Invalid message search query')
+    }
+
+    const response = await service.searchMessages(parsed.data.q, parsed.data.limit)
+    return context.json(publicMessageSearchResponseSchema.parse(response))
   })
 
   routes.post('/uploads', async (context) => {

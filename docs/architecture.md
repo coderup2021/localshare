@@ -136,6 +136,7 @@ user-web 不做登录、注册和账户管理。所有打开 user-web 的访问�
 | -------- | --------------------------------- | ----------------------------------------------------------- |
 | `GET`    | `/api/v1/public/bootstrap`        | 设置匿名访客 Cookie，返回频道信息、当前访客短标识和初始游标 |
 | `GET`    | `/api/v1/public/messages?cursor=` | 游标分页读取 public 历史                                    |
+| `GET`    | `/api/v1/public/search/messages`  | 在服务端搜索消息正文和附件文件名                            |
 | `POST`   | `/api/v1/public/messages`         | 幂等发送 public 消息                                        |
 | `DELETE` | `/api/v1/public/messages/:id`     | 匿名访客撤回自己发送的消息                                  |
 | `POST`   | `/api/v1/public/read`             | 更新当前匿名访客的已读位置                                  |
@@ -155,6 +156,8 @@ user-web 不做登录、注册和账户管理。所有打开 user-web 的访问�
 这个路径让超时重试、网络断开和 WebSocket 短暂不可用都不会产生重复或丢失消息。WebSocket 不作为唯一发送入口。
 
 撤回同样通过 HTTP 写入。服务端只允许匿名访客撤回 `senderId` 与当前访客 Cookie 一致的消息，写入 `recalledAt` 后广播 `message.recalled`；历史接口继续返回有序的撤回占位消息，但不再返回原文字或附件。
+
+消息搜索必须由服务端数据库执行，覆盖消息正文、图片/视频文件名和普通文件名，并排除已撤回或已删除消息。客户端等待输入停止 500ms 后请求 `/api/v1/public/search/messages`，结果以独立下拉列表展示，不直接改写聊天消息流。
 
 消息内容类型建议：
 

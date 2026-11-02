@@ -185,6 +185,29 @@ test('user message is visible to another anonymous browser', async ({ browser, p
   })
   await expect(page.getByText('松开鼠标即可发送文件')).toHaveCount(0)
 
+  let searchRequestCount = 0
+  page.on('request', (searchRequest) => {
+    if (searchRequest.url().includes('/api/v1/public/search/messages')) {
+      searchRequestCount += 1
+    }
+  })
+  await page.getByRole('button', { name: '搜索消息' }).click()
+  const searchInput = page.getByLabel('消息搜索关键词')
+  await searchInput.fill(droppedFileName)
+  await page.waitForTimeout(300)
+  expect(searchRequestCount).toBe(0)
+
+  const searchResults = page.getByLabel('搜索结果')
+  await expect(
+    searchResults.getByRole('button', { name: new RegExp(droppedFileName) }),
+  ).toBeVisible()
+  expect(searchRequestCount).toBe(1)
+  await searchResults.getByRole('button', { name: new RegExp(droppedFileName) }).click()
+  await expect(searchResults).toHaveCount(0)
+  const locatedMessage = page.locator('article').filter({ hasText: droppedFileName })
+  await expect(locatedMessage).toBeInViewport()
+  await expect(locatedMessage.locator('div').first()).toHaveClass(/ring-2/)
+
   const allTab = page.getByRole('tab', { name: '所有' })
   const mediaTab = page.getByRole('tab', { name: '图片与视频' })
   const filesTab = page.getByRole('tab', { name: '文件列表' })

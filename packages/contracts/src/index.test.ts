@@ -8,6 +8,7 @@ import {
   createPublicMessageRequestSchema,
   healthStatusSchema,
   publicMessageSchema,
+  publicMessageSearchResponseSchema,
   publicRealtimeEventSchema,
 } from './index'
 
@@ -116,6 +117,26 @@ describe('API contracts', () => {
           createdAt: '2026-11-02T10:00:00.000Z',
           recalledAt: '2026-11-02T10:01:00.000Z',
         },
+      }).success,
+    ).toBe(true)
+  })
+
+  test('validates message search responses', () => {
+    expect(
+      publicMessageSearchResponseSchema.safeParse({
+        query: 'hello',
+        messages: [
+          {
+            id: 'message-1',
+            seq: 1,
+            senderType: 'visitor',
+            senderId: 'visitor-1',
+            senderName: '访客',
+            kind: 'text',
+            text: 'hello',
+            createdAt: '2026-11-02T10:00:00.000Z',
+          },
+        ],
       }).success,
     ).toBe(true)
   })

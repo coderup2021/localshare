@@ -3,10 +3,12 @@ import {
   type PublicAttachment,
   type PublicBootstrapResponse,
   type PublicMessage,
+  type PublicMessageSearchResponse,
   type PublicMessageListResponse,
   publicBootstrapResponseSchema,
   publicAttachmentSchema,
   publicMessageListResponseSchema,
+  publicMessageSearchResponseSchema,
   publicMessageSchema,
 } from '@localshare/contracts'
 import axios from 'axios'
@@ -56,6 +58,21 @@ export async function fetchPublicMessages(beforeSeq?: number): Promise<PublicMes
       params: beforeSeq ? { beforeSeq, limit: 50 } : { limit: 50 },
     })
     return publicMessageListResponseSchema.parse(response.data)
+  } catch (error) {
+    throw normalizeError(error)
+  }
+}
+
+export async function searchPublicMessages(
+  query: string,
+  signal?: AbortSignal,
+): Promise<PublicMessageSearchResponse> {
+  try {
+    const response = await api.get('/api/v1/public/search/messages', {
+      params: { q: query, limit: 30 },
+      ...(signal ? { signal } : {}),
+    })
+    return publicMessageSearchResponseSchema.parse(response.data)
   } catch (error) {
     throw normalizeError(error)
   }

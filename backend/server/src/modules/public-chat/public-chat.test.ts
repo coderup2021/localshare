@@ -302,6 +302,81 @@ describe('public chat', () => {
     })
   })
 
+  test('searches text and attachment names in the database', async () => {
+    const visitor = await bootstrapVisitor()
+    const marker = `数据库搜索-${crypto.randomUUID()}`
+    const sentText = await app.request('/api/v1/public/messages', {
+      method: 'POST',
+      headers: {
+        cookie: visitor.cookie,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        text: marker,
+        clientRequestId: crypto.randomUUID(),
+      }),
+    })
+    expect(sentText.status).toBe(201)
+    const textMessage = (await sentText.json()) as { id: string }
+
+    const fileName = `搜索报告-${crypto.randomUUID()}.pdf`
+    const uploaded = await app.request('/api/v1/public/uploads', {
+      method: 'POST',
+      headers: {
+        cookie: visitor.cookie,
+        'content-type': 'application/pdf',
+        'x-file-name': encodeURIComponent(fileName),
+      },
+      body: 'search fixture',
+    })
+    expect(uploaded.status).toBe(201)
+    const attachment = (await uploaded.json()) as { id: string }
+    const sentFile = await app.request('/api/v1/public/messages', {
+      method: 'POST',
+      headers: {
+        cookie: visitor.cookie,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        text: '',
+        attachmentId: attachment.id,
+        clientRequestId: crypto.randomUUID(),
+      }),
+    })
+    expect(sentFile.status).toBe(201)
+
+    const textSearch = await app.request(
+      `/api/v1/public/search/messages?q=${encodeURIComponent(marker)}`,
+    )
+    expect(textSearch.status).toBe(200)
+    expect(await textSearch.json()).toMatchObject({
+      query: marker,
+      messages: [{ id: textMessage.id, text: marker }],
+    })
+
+    const fileSearch = await app.request(
+      `/api/v1/public/search/messages?q=${encodeURIComponent(fileName)}`,
+    )
+    expect(fileSearch.status).toBe(200)
+    expect(await fileSearch.json()).toMatchObject({
+      query: fileName,
+      messages: [{ attachment: { name: fileName } }],
+    })
+
+    const recalled = await app.request(`/api/v1/public/messages/${textMessage.id}`, {
+      method: 'DELETE',
+      headers: { cookie: visitor.cookie },
+    })
+    expect(recalled.status).toBe(200)
+    const hiddenSearch = await app.request(
+      `/api/v1/public/search/messages?q=${encodeURIComponent(marker)}`,
+    )
+    expect(await hiddenSearch.json()).toEqual({ query: marker, messages: [] })
+
+    const invalidSearch = await app.request('/api/v1/public/search/messages')
+    expect(invalidSearch.status).toBe(400)
+  })
+
   test('classifies inline images and videos by MIME type', async () => {
     const visitor = await bootstrapVisitor()
 

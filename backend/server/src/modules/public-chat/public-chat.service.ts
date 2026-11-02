@@ -3,9 +3,10 @@ import {
   type CreatePublicMessageRequest,
   type PublicBootstrapResponse,
   type PublicMessage,
+  type PublicMessageSearchResponse,
   type PublicMessageListResponse,
 } from '@localshare/contracts'
-import { and, desc, eq, isNull, lt } from 'drizzle-orm'
+import { and, desc, eq, isNull, lt, or, sql } from 'drizzle-orm'
 
 import { ensurePublicConversation } from '../../db/bootstrap'
 import type { DatabaseClient } from '../../db/client'
@@ -140,6 +141,42 @@ export class PublicChatService {
       }),
       hasMore,
       nextBeforeSeq: hasMore && page[0] ? page[0].seq : null,
+    }
+  }
+
+  async searchMessages(query: string, limit: number): Promise<PublicMessageSearchResponse> {
+    const conversation = await this.getPublicConversation()
+    const rows = await this.client.db
+      .select({
+        message: messages,
+        attachment: attachments,
+      })
+      .from(messages)
+      .leftJoin(attachments, eq(messages.attachmentId, attachments.id))
+      .where(
+        and(
+          eq(messages.conversationId, conversation.id),
+          isNull(messages.deletedAt),
+          isNull(messages.recalledAt),
+          or(
+            sql`instr(lower(${messages.text}), lower(${query})) > 0`,
+            sql`instr(lower(${attachments.originalName}), lower(${query})) > 0`,
+          ),
+        ),
+      )
+      .orderBy(desc(messages.seq))
+      .limit(limit)
+
+    return {
+      query,
+      messages: rows.map((row) =>
+        toPublicMessage(
+          row.message,
+          row.attachment && this.attachments
+            ? this.attachments.toPublicAttachment(row.attachment)
+            : undefined,
+        ),
+      ),
     }
   }
 

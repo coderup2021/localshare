@@ -10,6 +10,7 @@ import {
 
 import { ImageLightbox } from './components/chat/image-lightbox'
 import { MessageContextMenu } from './components/chat/message-context-menu'
+import { MessageSearch } from './components/chat/message-search'
 import { Button } from './components/ui/button'
 import { copyImage, copyText } from './lib/clipboard'
 import { describeHealth } from './lib/health'
@@ -51,6 +52,7 @@ export function App() {
   const [composerHintVisible, setComposerHintVisible] = useState(composerHintIsVisible)
   const [dragActive, setDragActive] = useState(false)
   const [messageFilter, setMessageFilter] = useState<MessageFilter>('all')
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null)
   const [viewerImageId, setViewerImageId] = useState<string | null>(null)
   const [contextMenu, setContextMenu] = useState<{
     messageId: string
@@ -155,6 +157,36 @@ export function App() {
     })
     return () => window.cancelAnimationFrame(frame)
   }, [messageFilter])
+
+  useEffect(() => {
+    if (!highlightedMessageId) return
+
+    stickToLatestRef.current = false
+    const highlightTimer = window.setTimeout(() => setHighlightedMessageId(null), 2_400)
+    const frame = window.requestAnimationFrame(() => {
+      const messageList = messageListRef.current
+      const message = messageList?.querySelector<HTMLElement>(
+        `[data-message-id="${highlightedMessageId}"]`,
+      )
+      if (!messageList || !message) return
+
+      const listBounds = messageList.getBoundingClientRect()
+      const messageBounds = message.getBoundingClientRect()
+      messageList.scrollTo({
+        top:
+          messageList.scrollTop +
+          messageBounds.top -
+          listBounds.top -
+          (messageList.clientHeight - messageBounds.height) / 2,
+        behavior: 'smooth',
+      })
+    })
+
+    return () => {
+      window.cancelAnimationFrame(frame)
+      window.clearTimeout(highlightTimer)
+    }
+  }, [highlightedMessageId, messages])
 
   useEffect(() => {
     const messageContent = messageContentRef.current
@@ -305,6 +337,13 @@ export function App() {
     })
   }
 
+  const handleSelectSearchResult = (message: PublicMessage) => {
+    setMessageFilter('all')
+    setContextMenu(null)
+    receiveMessage(message)
+    setHighlightedMessageId(message.id)
+  }
+
   const composerDisabled = sending || uploading || loading || !visitor
   const composerStatus =
     draftError ??
@@ -334,10 +373,7 @@ export function App() {
     <main className="mx-auto flex h-screen w-full max-w-6xl flex-col overflow-hidden px-4 py-5 sm:px-8 sm:py-8">
       <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border pb-5">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">
-            Local network
-          </p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">LocalShare</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">LocalShare</h1>
         </div>
         <div className="flex items-center gap-3">
           {visitor ? (
@@ -362,50 +398,63 @@ export function App() {
         <div className="mx-auto flex h-full min-h-0 w-full max-w-3xl flex-col overflow-hidden rounded-[2rem] border border-border bg-card shadow-[0_24px_80px_-48px_rgba(25,45,30,0.45)]">
           <div className="shrink-0 border-b border-border">
             <div className="flex items-center justify-between px-5 py-4 sm:px-7">
-              <div>
-                <p className="text-xs font-medium text-primary">公开会话</p>
-                <h2 className="mt-1 text-xl font-semibold tracking-tight">
-                  {conversation?.title ?? '公共频道'}
-                </h2>
-              </div>
+              <h2 className="text-xl font-semibold tracking-tight">
+                {conversation?.title ?? '公共频道'}
+              </h2>
               <Button
                 type="button"
                 variant="ghost"
-                size="sm"
+                size="icon"
+                aria-label={refreshing ? '正在刷新消息' : '刷新消息'}
+                title="刷新消息"
                 disabled={refreshing}
                 onClick={() => void refreshChat()}
               >
-                {refreshing ? '刷新中…' : '刷新消息'}
+                <svg
+                  viewBox="0 0 24 24"
+                  className={`size-4.5 ${refreshing ? 'animate-spin' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  aria-hidden="true"
+                >
+                  <path d="M20 7v5h-5" />
+                  <path d="M4 17v-5h5" />
+                  <path d="M6.1 9a7 7 0 0 1 11.4-2L20 9M4 15l2.5 2a7 7 0 0 0 11.4-2" />
+                </svg>
               </Button>
             </div>
-            <div
-              role="tablist"
-              aria-label="消息分类"
-              className="flex gap-1 overflow-x-auto px-4 sm:px-6"
-            >
-              {MESSAGE_FILTERS.map((filter) => {
-                const selected = messageFilter === filter.id
-                return (
-                  <button
-                    key={filter.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={selected}
-                    aria-controls="message-list"
-                    className={`shrink-0 border-b-2 px-3 py-2.5 text-sm transition ${
-                      selected
-                        ? 'border-primary font-medium text-primary'
-                        : 'border-transparent text-muted-foreground hover:text-foreground'
-                    }`}
-                    onClick={() => {
-                      setMessageFilter(filter.id)
-                      setContextMenu(null)
-                    }}
-                  >
-                    {filter.label}
-                  </button>
-                )
-              })}
+            <div className="flex items-center gap-2 px-4 sm:px-6">
+              <div
+                role="tablist"
+                aria-label="消息分类"
+                className="flex min-w-0 flex-1 gap-1 overflow-x-auto"
+              >
+                {MESSAGE_FILTERS.map((filter) => {
+                  const selected = messageFilter === filter.id
+                  return (
+                    <button
+                      key={filter.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={selected}
+                      aria-controls="message-list"
+                      className={`shrink-0 rounded-t-lg border-b-2 px-3 py-2.5 text-sm transition ${
+                        selected
+                          ? 'border-primary bg-primary/10 font-medium text-primary'
+                          : 'border-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground'
+                      }`}
+                      onClick={() => {
+                        setMessageFilter(filter.id)
+                        setContextMenu(null)
+                      }}
+                    >
+                      {filter.label}
+                    </button>
+                  )
+                })}
+              </div>
+              <MessageSearch onSelectMessage={handleSelectSearchResult} />
             </div>
           </div>
 
@@ -462,6 +511,10 @@ export function App() {
                     >
                       <div
                         className={`max-w-[85%] rounded-2xl px-4 py-3 ${
+                          highlightedMessageId === message.id
+                            ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-card'
+                            : ''
+                        } ${
                           message.recalledAt
                             ? 'rounded-b-md border border-border bg-muted text-muted-foreground'
                             : ownMessage
@@ -694,10 +747,6 @@ export function App() {
           </form>
         </div>
       </section>
-
-      <footer className="shrink-0 border-t border-border pt-4 text-xs text-muted-foreground">
-        Web 入口 7777 · API 5678 · 公开消息仅保存在本地
-      </footer>
 
       {contextMenu && contextMessage && !contextMessage.recalledAt ? (
         <MessageContextMenu
