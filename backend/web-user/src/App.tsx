@@ -591,7 +591,7 @@ export function App() {
           </div>
 
           <form
-            className={`relative shrink-0 border-t border-border p-4 sm:p-5 ${
+            className={`relative shrink-0 border-t border-border p-3 sm:p-4 ${
               dragActive ? 'bg-primary/5' : ''
             }`}
             onSubmit={(event) => void submit(event)}
@@ -601,149 +601,145 @@ export function App() {
             onDrop={handleDrop}
           >
             {dragActive ? (
-              <div className="pointer-events-none absolute inset-2 z-20 flex items-center justify-center rounded-[1.75rem] border-2 border-dashed border-primary bg-card/95 text-sm font-medium text-primary shadow-lg">
+              <div className="pointer-events-none absolute inset-2 z-20 flex items-center justify-center rounded-2xl border-2 border-dashed border-primary bg-card/95 text-sm font-medium text-primary">
                 松开鼠标即可发送文件
               </div>
             ) : null}
-            <div className="overflow-hidden rounded-[1.75rem] border border-border bg-card shadow-[0_18px_55px_-32px_rgba(25,45,30,0.55)]">
-              <div className="flex items-center gap-1 px-3 py-2 sm:px-4">
-                <input
-                  id="image-input"
-                  aria-label="选择图片文件"
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  className="hidden"
-                  onChange={(event) => {
-                    const files = Array.from(event.currentTarget.files ?? [])
-                    event.currentTarget.value = ''
-                    sendSelectedFiles(files)
-                  }}
-                />
-                <button
-                  type="button"
-                  aria-label="添加图片"
-                  title="添加图片"
-                  disabled={composerDisabled}
-                  className="inline-flex size-9 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
-                  onClick={() => document.getElementById('image-input')?.click()}
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    className="size-5"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.7"
-                    aria-hidden="true"
-                  >
-                    <rect x="3" y="4" width="18" height="16" rx="3" />
-                    <circle cx="9" cy="10" r="1.5" />
-                    <path d="m4 17 5-5 4 4 2-2 5 5" />
-                  </svg>
-                </button>
-
-                <input
-                  id="file-input"
-                  aria-label="选择文件"
-                  type="file"
-                  multiple
-                  className="hidden"
-                  onChange={(event) => {
-                    const files = Array.from(event.currentTarget.files ?? [])
-                    event.currentTarget.value = ''
-                    sendSelectedFiles(files)
-                  }}
-                />
-                <button
-                  type="button"
-                  aria-label="添加文件"
-                  title="添加文件"
-                  disabled={composerDisabled}
-                  className="inline-flex size-9 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
-                  onClick={() => document.getElementById('file-input')?.click()}
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    className="size-5"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.7"
-                    aria-hidden="true"
-                  >
-                    <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z" />
-                    <path d="M14 3v6h6M8 13h8M8 17h6" />
-                  </svg>
-                </button>
-              </div>
-
-              <textarea
-                id="message-input"
-                aria-label="消息内容"
-                aria-describedby={
-                  composerStatus || composerHintVisible ? 'composer-hint' : undefined
-                }
-                value={draft}
+            <div className="flex items-center gap-0.5">
+              <input
+                id="image-input"
+                aria-label="选择图片文件"
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
                 onChange={(event) => {
-                  setDraft(event.target.value)
-                  setDraftError(null)
+                  const files = Array.from(event.currentTarget.files ?? [])
+                  event.currentTarget.value = ''
+                  sendSelectedFiles(files)
                 }}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
-                    event.preventDefault()
-                    event.currentTarget.form?.requestSubmit()
-                  }
-                }}
-                placeholder="输入消息，Enter 发送，Shift+Enter 换行"
-                rows={4}
-                maxLength={2_000}
-                disabled={composerDisabled}
-                className="min-h-32 w-full resize-none border-0 bg-transparent px-5 py-2 text-[15px] leading-7 outline-none placeholder:text-muted-foreground/80 disabled:cursor-not-allowed disabled:opacity-60 sm:px-6"
               />
+              <button
+                type="button"
+                aria-label="添加图片"
+                title="添加图片"
+                disabled={composerDisabled}
+                className="inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+                onClick={() => document.getElementById('image-input')?.click()}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  className="size-5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  aria-hidden="true"
+                >
+                  <rect x="3" y="4" width="18" height="16" rx="3" />
+                  <circle cx="9" cy="10" r="1.5" />
+                  <path d="m4 17 5-5 4 4 2-2 5 5" />
+                </svg>
+              </button>
 
-              {composerStatus || composerHintVisible ? (
-                <div className="border-t border-border/70 px-4 py-2.5 sm:px-5">
-                  <div className="flex items-center gap-3">
-                    <p
-                      id="composer-hint"
-                      aria-live="polite"
-                      className={`min-w-0 flex-1 text-xs ${
-                        draftError || chatError ? 'text-red-600' : 'text-muted-foreground'
-                      }`}
+              <input
+                id="file-input"
+                aria-label="选择文件"
+                type="file"
+                multiple
+                className="hidden"
+                onChange={(event) => {
+                  const files = Array.from(event.currentTarget.files ?? [])
+                  event.currentTarget.value = ''
+                  sendSelectedFiles(files)
+                }}
+              />
+              <button
+                type="button"
+                aria-label="添加文件"
+                title="添加文件"
+                disabled={composerDisabled}
+                className="inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+                onClick={() => document.getElementById('file-input')?.click()}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  className="size-5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  aria-hidden="true"
+                >
+                  <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z" />
+                  <path d="M14 3v6h6M8 13h8M8 17h6" />
+                </svg>
+              </button>
+            </div>
+
+            <textarea
+              id="message-input"
+              aria-label="消息内容"
+              aria-describedby={composerStatus || composerHintVisible ? 'composer-hint' : undefined}
+              value={draft}
+              onChange={(event) => {
+                setDraft(event.target.value)
+                setDraftError(null)
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+                  event.preventDefault()
+                  event.currentTarget.form?.requestSubmit()
+                }
+              }}
+              placeholder="输入消息，Enter 发送，Shift+Enter 换行"
+              rows={4}
+              maxLength={2_000}
+              disabled={composerDisabled}
+              className="mt-1 min-h-28 w-full resize-none border-0 bg-transparent px-2 py-1 text-[15px] leading-7 outline-none placeholder:text-muted-foreground/80 disabled:cursor-not-allowed disabled:opacity-60"
+            />
+
+            {composerStatus || composerHintVisible ? (
+              <div className="px-2 pt-1">
+                <div className="flex items-center gap-3">
+                  <p
+                    id="composer-hint"
+                    aria-live="polite"
+                    className={`min-w-0 flex-1 text-xs ${
+                      draftError || chatError ? 'text-red-600' : 'text-muted-foreground'
+                    }`}
+                  >
+                    {composerStatus ?? 'Enter 发送 · Shift+Enter 换行'}
+                  </p>
+                  {composerHintVisible && !composerStatus ? (
+                    <button
+                      type="button"
+                      aria-label="隐藏输入提示"
+                      title="隐藏输入提示"
+                      className="inline-flex size-5 shrink-0 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                      onClick={dismissComposerHint}
                     >
-                      {composerStatus ?? 'Enter 发送 · Shift+Enter 换行'}
-                    </p>
-                    {composerHintVisible && !composerStatus ? (
-                      <button
-                        type="button"
-                        aria-label="隐藏输入提示"
-                        title="隐藏输入提示"
-                        className="inline-flex size-5 shrink-0 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground"
-                        onClick={dismissComposerHint}
+                      <svg
+                        viewBox="0 0 20 20"
+                        className="size-3.5"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        aria-hidden="true"
                       >
-                        <svg
-                          viewBox="0 0 20 20"
-                          className="size-3.5"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.8"
-                          aria-hidden="true"
-                        >
-                          <path d="m5 5 10 10M15 5 5 15" />
-                        </svg>
-                      </button>
-                    ) : null}
-                  </div>
-                  {uploading ? (
-                    <div className="mt-2 h-1 overflow-hidden rounded-full bg-muted">
-                      <div
-                        className="h-full rounded-full bg-primary transition-[width]"
-                        style={{ width: `${uploadProgress}%` }}
-                      />
-                    </div>
+                        <path d="m5 5 10 10M15 5 5 15" />
+                      </svg>
+                    </button>
                   ) : null}
                 </div>
-              ) : null}
-            </div>
+                {uploading ? (
+                  <div className="mt-2 h-1 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full bg-primary transition-[width]"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
           </form>
         </div>
       </section>
