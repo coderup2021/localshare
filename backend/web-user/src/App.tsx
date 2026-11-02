@@ -11,7 +11,6 @@ import { useServiceStore } from './stores/service-store'
 export function App() {
   const [draft, setDraft] = useState('')
   const [draftError, setDraftError] = useState<string | null>(null)
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const messageEndRef = useRef<HTMLDivElement>(null)
   const lastMessageSeqRef = useRef(0)
 
@@ -29,13 +28,16 @@ export function App() {
   const sending = usePublicChatStore((state) => state.sending)
   const uploading = usePublicChatStore((state) => state.uploading)
   const uploadProgress = usePublicChatStore((state) => state.uploadProgress)
+  const uploadFileIndex = usePublicChatStore((state) => state.uploadFileIndex)
+  const uploadFileTotal = usePublicChatStore((state) => state.uploadFileTotal)
+  const uploadFileName = usePublicChatStore((state) => state.uploadFileName)
   const realtimeConnected = usePublicChatStore((state) => state.realtimeConnected)
   const chatError = usePublicChatStore((state) => state.error)
   const initializeChat = usePublicChatStore((state) => state.initialize)
   const refreshChat = usePublicChatStore((state) => state.refresh)
   const loadOlder = usePublicChatStore((state) => state.loadOlder)
   const sendMessage = usePublicChatStore((state) => state.send)
-  const sendAttachment = usePublicChatStore((state) => state.sendAttachment)
+  const sendFiles = usePublicChatStore((state) => state.sendFiles)
   const receiveMessage = usePublicChatStore((state) => state.receiveMessage)
   const setRealtimeConnected = usePublicChatStore((state) => state.setRealtimeConnected)
 
@@ -73,21 +75,6 @@ export function App() {
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
-    if (selectedFile) {
-      if (draft.length > 2_000) {
-        setDraftError('消息说明不能超过 2000 个字符')
-        return
-      }
-
-      setDraftError(null)
-      const sent = await sendAttachment(selectedFile, draft.trim())
-      if (sent) {
-        setDraft('')
-        setSelectedFile(null)
-      }
-      return
-    }
-
     const parsed = createPublicMessageRequestSchema.safeParse({
       text: draft,
       clientRequestId: createClientRequestId(),
@@ -103,6 +90,13 @@ export function App() {
     if (sent) setDraft('')
   }
 
+  const sendSelectedFiles = (files: File[]) => {
+    if (files.length === 0) return
+    setDraftError(null)
+    void sendFiles(files)
+  }
+
+  const composerDisabled = sending || uploading || loading || !visitor
   const isOnline = healthState === 'online'
 
   return (
@@ -247,78 +241,125 @@ export function App() {
             className="border-t border-border p-4 sm:p-5"
             onSubmit={(event) => void submit(event)}
           >
-            {chatError || draftError ? (
-              <p className="mb-3 text-xs text-red-600">{draftError ?? chatError}</p>
-            ) : null}
-            <div className="flex items-end gap-3">
-              <label className="sr-only" htmlFor="message-input">
-                消息内容
-              </label>
+            <div className="overflow-hidden rounded-[1.75rem] border border-border bg-card shadow-[0_18px_55px_-32px_rgba(25,45,30,0.55)]">
+              <div className="flex items-center gap-1 px-3 py-2 sm:px-4">
+                <input
+                  id="image-input"
+                  aria-label="选择图片文件"
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(event) => {
+                    const files = Array.from(event.currentTarget.files ?? [])
+                    event.currentTarget.value = ''
+                    sendSelectedFiles(files)
+                  }}
+                />
+                <button
+                  type="button"
+                  aria-label="添加图片"
+                  title="添加图片"
+                  disabled={composerDisabled}
+                  className="inline-flex size-9 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+                  onClick={() => document.getElementById('image-input')?.click()}
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="size-5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.7"
+                    aria-hidden="true"
+                  >
+                    <rect x="3" y="4" width="18" height="16" rx="3" />
+                    <circle cx="9" cy="10" r="1.5" />
+                    <path d="m4 17 5-5 4 4 2-2 5 5" />
+                  </svg>
+                </button>
+
+                <input
+                  id="file-input"
+                  aria-label="选择文件"
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={(event) => {
+                    const files = Array.from(event.currentTarget.files ?? [])
+                    event.currentTarget.value = ''
+                    sendSelectedFiles(files)
+                  }}
+                />
+                <button
+                  type="button"
+                  aria-label="添加文件"
+                  title="添加文件"
+                  disabled={composerDisabled}
+                  className="inline-flex size-9 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+                  onClick={() => document.getElementById('file-input')?.click()}
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="size-5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.7"
+                    aria-hidden="true"
+                  >
+                    <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z" />
+                    <path d="M14 3v6h6M8 13h8M8 17h6" />
+                  </svg>
+                </button>
+              </div>
+
               <textarea
                 id="message-input"
                 aria-label="消息内容"
+                aria-describedby="composer-status"
                 value={draft}
                 onChange={(event) => {
                   setDraft(event.target.value)
                   setDraftError(null)
                 }}
                 onKeyDown={(event) => {
-                  if (event.key === 'Enter' && !event.shiftKey) {
+                  if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
                     event.preventDefault()
                     event.currentTarget.form?.requestSubmit()
                   }
                 }}
                 placeholder="输入消息，Enter 发送，Shift+Enter 换行"
-                rows={2}
+                rows={4}
                 maxLength={2_000}
-                className="min-h-12 flex-1 resize-none rounded-xl border border-border bg-background px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
+                disabled={composerDisabled}
+                className="min-h-32 w-full resize-none border-0 bg-transparent px-5 py-2 text-[15px] leading-7 outline-none placeholder:text-muted-foreground/80 disabled:cursor-not-allowed disabled:opacity-60 sm:px-6"
               />
-              <div className="flex flex-col gap-1">
-                <input
-                  id="attachment-input"
-                  aria-label="选择附件"
-                  type="file"
-                  className="sr-only"
-                  onChange={(event) => {
-                    setSelectedFile(event.target.files?.[0] ?? null)
-                    setDraftError(null)
-                  }}
-                />
-                <label
-                  htmlFor="attachment-input"
-                  className="cursor-pointer rounded-lg px-3 py-1 text-center text-xs text-muted-foreground hover:bg-muted"
+
+              <div className="border-t border-border/70 px-4 py-2.5 sm:px-5">
+                <p
+                  id="composer-status"
+                  aria-live="polite"
+                  className={`text-xs ${
+                    draftError || chatError ? 'text-red-600' : 'text-muted-foreground'
+                  }`}
                 >
-                  {selectedFile ? '更换附件' : '选择附件'}
-                </label>
-                {selectedFile ? (
-                  <button
-                    type="button"
-                    className="px-3 text-center text-xs text-red-600"
-                    onClick={() => setSelectedFile(null)}
-                  >
-                    移除
-                  </button>
+                  {draftError ??
+                    chatError ??
+                    (uploading
+                      ? `正在发送 ${uploadFileIndex}/${uploadFileTotal} · ${uploadFileName} · ${uploadProgress}%`
+                      : sending
+                        ? '正在发送消息…'
+                        : 'Enter 发送 · Shift+Enter 换行')}
+                </p>
+                {uploading ? (
+                  <div className="mt-2 h-1 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full bg-primary transition-[width]"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
                 ) : null}
               </div>
-              <Button
-                type="submit"
-                disabled={sending || uploading || loading || !visitor}
-                className="h-12 px-5"
-              >
-                {uploading
-                  ? `上传 ${uploadProgress}%`
-                  : sending
-                    ? '发送中…'
-                    : selectedFile
-                      ? '发送文件'
-                      : '发送'}
-              </Button>
             </div>
-            {selectedFile ? (
-              <p className="mt-2 text-xs text-muted-foreground">
-                已选择：{selectedFile.name} · {formatBytes(selectedFile.size)}
-              </p>
-            ) : null}
           </form>
         </div>
       </section>

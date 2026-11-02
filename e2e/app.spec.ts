@@ -51,24 +51,30 @@ test('user message is visible to another anonymous browser', async ({ browser, p
   await expect(secondPage.getByText('实时已连接')).toBeVisible()
 
   const message = `E2E public message ${Date.now()}`
-  await page.getByLabel('消息内容').fill(message)
-  await page.getByRole('button', { name: '发送' }).click()
+  const composer = page.getByLabel('消息内容')
+  await expect(page.getByRole('button', { name: '发送', exact: true })).toHaveCount(0)
+  await expect(page.getByLabel('添加文件夹')).toHaveCount(0)
+  await composer.fill(message)
+  await composer.press('Shift+Enter')
+  await composer.type('second line')
+  await expect(composer).toHaveValue(`${message}\nsecond line`)
+  await expect(page.locator('article').filter({ hasText: message })).toHaveCount(0)
+  await composer.press('Enter')
   await expect(page.locator('article').filter({ hasText: message })).toBeVisible()
   await expect(secondPage.locator('article').filter({ hasText: message })).toBeVisible({
     timeout: 5_000,
   })
 
   const attachmentName = `e2e-${Date.now()}.txt`
-  await page.getByLabel('选择附件').setInputFiles({
+  await page.getByLabel('选择文件', { exact: true }).setInputFiles({
     name: attachmentName,
     mimeType: 'text/plain',
     buffer: Buffer.from('LocalShare attachment E2E'),
   })
-  await expect(page.getByText(`已选择：${attachmentName}`)).toBeVisible()
-  await page.getByRole('button', { name: '发送文件' }).click()
 
   const attachmentArticle = page.locator('article').filter({ hasText: attachmentName })
   await expect(attachmentArticle).toBeVisible()
+  await expect(page.getByLabel('待发送附件')).toHaveCount(0)
   await expect(secondPage.locator('article').filter({ hasText: attachmentName })).toBeVisible({
     timeout: 5_000,
   })
@@ -80,7 +86,7 @@ test('user message is visible to another anonymous browser', async ({ browser, p
   expect(await attachmentResponse.text()).toBe('LocalShare attachment E2E')
 
   const imageName = `pixel-${Date.now()}.png`
-  await page.getByLabel('选择附件').setInputFiles({
+  await page.getByLabel('选择图片文件', { exact: true }).setInputFiles({
     name: imageName,
     mimeType: 'image/png',
     buffer: Buffer.from(
@@ -88,7 +94,6 @@ test('user message is visible to another anonymous browser', async ({ browser, p
       'base64',
     ),
   })
-  await page.getByRole('button', { name: '发送文件' }).click()
   await expect(page.getByRole('img', { name: imageName })).toBeVisible()
   await expect(secondPage.getByRole('img', { name: imageName })).toBeVisible({
     timeout: 5_000,
@@ -144,8 +149,9 @@ test('non-loopback browser can send public messages', async ({ browser }) => {
   await expect(page.getByText('实时已连接')).toBeVisible()
 
   const message = `LAN E2E message ${Date.now()}`
-  await page.getByLabel('消息内容').fill(message)
-  await page.getByRole('button', { name: '发送' }).click()
+  const composer = page.getByLabel('消息内容')
+  await composer.fill(message)
+  await composer.press('Enter')
   await expect(page.locator('article').filter({ hasText: message })).toBeVisible()
   expect(browserErrors).toEqual([])
 

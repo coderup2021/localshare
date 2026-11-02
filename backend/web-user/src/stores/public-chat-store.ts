@@ -28,13 +28,16 @@ type PublicChatState = {
   sending: boolean
   uploading: boolean
   uploadProgress: number
+  uploadFileIndex: number
+  uploadFileTotal: number
+  uploadFileName: string | null
   realtimeConnected: boolean
   error: string | null
   initialize: () => Promise<void>
   refresh: () => Promise<void>
   loadOlder: () => Promise<void>
   send: (request: CreatePublicMessageRequest) => Promise<boolean>
-  sendAttachment: (file: File, text: string) => Promise<boolean>
+  sendFiles: (files: File[]) => Promise<boolean>
   receiveMessage: (message: PublicMessage) => void
   setRealtimeConnected: (connected: boolean) => void
 }
@@ -57,6 +60,9 @@ export const usePublicChatStore = create<PublicChatState>((set, get) => ({
   sending: false,
   uploading: false,
   uploadProgress: 0,
+  uploadFileIndex: 0,
+  uploadFileTotal: 0,
+  uploadFileName: null,
   realtimeConnected: false,
   error: null,
   initialize: async () => {
@@ -149,39 +155,66 @@ export const usePublicChatStore = create<PublicChatState>((set, get) => ({
       return false
     }
   },
-  sendAttachment: async (file, text) => {
+  sendFiles: async (files) => {
     const state = get()
-    if (state.sending || state.uploading) return false
-
-    set({ uploading: true, uploadProgress: 0, error: null })
-    try {
-      const attachment = await uploadPublicAttachment(file, (percent) =>
-        set({ uploadProgress: percent }),
-      )
-      const message = await sendPublicMessage({
-        text,
-        attachmentId: attachment.id,
-        clientRequestId: createClientRequestId(),
-      })
-      const nextMessages = get()
-        .messages.filter((existing) => existing.id !== message.id)
-        .concat(message)
-        .sort((left, right) => left.seq - right.seq)
-
-      set({
-        messages: nextMessages,
-        uploading: false,
-        uploadProgress: 100,
-      })
-      return true
-    } catch (error) {
-      set({
-        uploading: false,
-        uploadProgress: 0,
-        error: messageFromError(error),
-      })
+    if (files.length === 0 || state.sending || state.uploading) {
       return false
     }
+
+    set({
+      uploading: true,
+      uploadProgress: 0,
+      uploadFileIndex: 1,
+      uploadFileTotal: files.length,
+      uploadFileName: files[0]?.name ?? null,
+      error: null,
+    })
+
+    for (const [index, file] of files.entries()) {
+      set({
+        uploadFileIndex: index + 1,
+        uploadFileName: file.name,
+      })
+
+      try {
+        const attachment = await uploadPublicAttachment(file, (percent) => {
+          set({
+            uploadProgress: Math.round(((index + percent / 100) / files.length) * 100),
+          })
+        })
+        const message = await sendPublicMessage({
+          text: '',
+          attachmentId: attachment.id,
+          clientRequestId: createClientRequestId(),
+        })
+        const nextMessages = get()
+          .messages.filter((existing) => existing.id !== message.id)
+          .concat(message)
+          .sort((left, right) => left.seq - right.seq)
+
+        set({ messages: nextMessages })
+      } catch (error) {
+        const prefix = files.length > 1 ? `${file.name}：` : ''
+        set({
+          uploading: false,
+          uploadProgress: 0,
+          uploadFileIndex: 0,
+          uploadFileTotal: 0,
+          uploadFileName: null,
+          error: `${prefix}${messageFromError(error)}`,
+        })
+        return false
+      }
+    }
+
+    set({
+      uploading: false,
+      uploadProgress: 100,
+      uploadFileIndex: 0,
+      uploadFileTotal: 0,
+      uploadFileName: null,
+    })
+    return true
   },
   receiveMessage: (message) => {
     const nextMessages = get()
