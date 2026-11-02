@@ -82,6 +82,18 @@ localshare start --data-dir /srv/localshare --ip 0.0.0.0
 bun run pack:server
 ```
 
+本地构建并安装到隔离的临时 npm 全局目录：
+
+```bash
+bun run install:local
+```
+
+命令完成后可通过固定的最新安装入口运行：
+
+```bash
+/tmp/localshare-local-current/bin/localshare start
+```
+
 当前发布物支持 Linux x64；不支持平台会明确失败。安装阶段不会启动服务或创建业务数据。
 
 ## 质量检查

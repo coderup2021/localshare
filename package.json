@@ -21,6 +21,7 @@
     "db:generate": "bun run --cwd backend/server db:generate",
     "db:migrate": "bun run --cwd backend/server db:migrate",
     "pack:server": "bun run scripts/pack-server.ts",
+    "install:local": "bun run scripts/install-local.ts",
     "graph:index": "codegraph index .",
     "graph:sync": "codegraph sync .",
     "graph:status": "codegraph status ."
