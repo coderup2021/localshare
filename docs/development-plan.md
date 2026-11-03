@@ -364,7 +364,7 @@ CodeGraph 是跨里程碑的强制开发工具：M0 完成仓库根目录初始�
 - 主包名确定为 `localshare-server`，运行时包覆盖 Linux x64/arm64、Windows x64、macOS x64/arm64；全局命令仍为 `localshare`。
 - `bun run pack:server` 生成主包和平台包 tarball，主包不包含源码、测试、本地数据库、上传文件或 CodeGraph。
 - `bun run install:local` 自动构建并使用随机临时 npm prefix 全局安装当前平台的主包和运行时包，生成临时目录下 `localshare-local-current/bin/localshare` 稳定测试入口。
-- `bun run publish:npm` 从被 Git 忽略的 `.env.publish` 读取 granular access token，构建主包和五个平台 tarball，并逐包执行 `npm stage publish`；不提示 2FA，后续由维护者在 npm 平台批准到 production。发布要求 Bun 1.4.4+ 和 npm 11.21.1+；重复执行会跳过版本和内容哈希一致的已 staged 包。
+- `bun run publish:npm` 从被 Git 忽略的 `.env.publish` 读取 granular access token；构建前交互提示发布版本，默认当前稳定版 patch+1，也支持命令参数或 `LOCALSHARE_RELEASE_VERSION`。随后构建主包和五个平台 tarball，并逐包执行 `npm stage publish`；不提示 2FA，后续由维护者在 npm 平台批准到 production。全部 stage 成功后同步源码版本；失败时保持源码版本不变。发布要求 Bun 1.4.4+ 和 npm 11.21.1+；重复执行会跳过版本和内容哈希一致的已 staged 包。
 - 主包包含 Node 兼容 CLI、user-web/admin-web 静态产物和 Drizzle migrations；平台包包含 Bun 编译后的独立服务二进制。
 - `start/stop/restart/status/logs` 已实现；首次启动、默认密码提示、端口冲突检查、PID/lock、实例指针、日志和优雅停止均已落地。
 - `stop`/`restart` 使用每次启动生成的私有控制令牌调用跨平台优雅关闭端点，避免 Windows 缺少 POSIX 信号导致直接杀进程；旧实例或端点不可用时保留信号与 `taskkill` 回退。

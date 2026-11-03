@@ -1,7 +1,10 @@
 import { createHash } from 'node:crypto'
-import { readFileSync } from 'node:fs'
+import { readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { createInterface } from 'node:readline/promises'
 import { fileURLToPath } from 'node:url'
+
+import { defaultNextReleaseVersion, normalizeReleaseVersion } from './release-version'
 
 const registry = 'https://registry.npmjs.org/'
 const root = fileURLToPath(new URL('..', import.meta.url))
@@ -146,7 +149,57 @@ function printStageList(packageName: string, env: NodeJS.ProcessEnv) {
   }
 }
 
-function main() {
+async function promptReleaseVersion(current: string, provided?: string) {
+  const defaultVersion = defaultNextReleaseVersion(current)
+  if (provided) return normalizeReleaseVersion(provided)
+  if (!process.stdin.isTTY) return defaultVersion
+
+  const readline = createInterface({ input: process.stdin, output: process.stdout })
+  try {
+    while (true) {
+      const answer = (
+        await readline.question(
+          `Current version: ${current}\nRelease version [${defaultVersion}]: `,
+        )
+      ).trim()
+      try {
+        return normalizeReleaseVersion(answer || defaultVersion)
+      } catch (error) {
+        console.error(error instanceof Error ? error.message : String(error))
+      }
+    }
+  } finally {
+    readline.close()
+  }
+}
+
+function writeJson(path: string, value: unknown) {
+  const temporary = `${path}.${process.pid}.tmp`
+  writeFileSync(temporary, `${JSON.stringify(value, null, 2)}\n`)
+  renameSync(temporary, path)
+}
+
+function updateSourceVersions(version: string, platforms: ReleaseManifest['platforms']) {
+  const serverPackagePath = join(root, 'backend', 'server', 'package.json')
+  const serverPackage = JSON.parse(readFileSync(serverPackagePath, 'utf8')) as {
+    version: string
+  }
+  serverPackage.version = version
+  writeJson(serverPackagePath, serverPackage)
+
+  const npmPackagePath = join(root, 'backend', 'server', 'npm', 'package.json')
+  const npmPackage = JSON.parse(readFileSync(npmPackagePath, 'utf8')) as {
+    version: string
+    optionalDependencies?: Record<string, string>
+  }
+  npmPackage.version = version
+  npmPackage.optionalDependencies = Object.fromEntries(
+    platforms.map((platform) => [platform.name, version]),
+  )
+  writeJson(npmPackagePath, npmPackage)
+}
+
+async function main() {
   const token = readPublishToken()
   const env = npmEnvironment(token)
   const stageHelp = capture(['npm', 'stage', '--help'], env)
@@ -159,8 +212,25 @@ function main() {
   }
   console.log(`Npm token account: ${whoami.stdout.toString().trim()}`)
 
-  run(['bun', 'run', 'pack:server'])
+  const currentVersion = (
+    JSON.parse(readFileSync(join(root, 'backend', 'server', 'package.json'), 'utf8')) as {
+      version: string
+    }
+  ).version
+  const releaseVersion = await promptReleaseVersion(
+    currentVersion,
+    process.argv[2] ?? process.env.LOCALSHARE_RELEASE_VERSION,
+  )
+  console.log(`Release version: ${releaseVersion}`)
+
+  run(['bun', 'run', 'pack:server'], root, {
+    ...process.env,
+    LOCALSHARE_RELEASE_VERSION: releaseVersion,
+  })
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as ReleaseManifest
+  if (manifest.version !== releaseVersion) {
+    throw new Error(`Packed version ${manifest.version} does not match ${releaseVersion}`)
+  }
   const releaseRoot = join(root, '.release', 'npm')
   const mainDirectory = join(releaseRoot, 'localshare-server')
   const artifactPath = (artifact: string) => join(releaseRoot, 'artifacts', artifact)
@@ -178,14 +248,16 @@ function main() {
   for (const platform of manifest.platforms) printStageList(platform.name, env)
   printStageList('localshare-server', env)
 
+  updateSourceVersions(manifest.version, manifest.platforms)
   console.log('')
   console.log(`LocalShare ${manifest.version} staged successfully.`)
+  console.log(`Source package version updated to ${manifest.version}.`)
   console.log('Review and approve the staged versions in the npm package web interface.')
 }
 
 if (import.meta.main) {
   try {
-    main()
+    await main()
   } catch (error) {
     console.error(`publish-npm: ${error instanceof Error ? error.message : String(error)}`)
     process.exitCode = 1

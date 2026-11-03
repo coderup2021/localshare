@@ -146,7 +146,7 @@ bun run db:migrate     # 应用 migration
 bun run pack:server    # 构建并生成可检查的 npm tarball
 bun run install:local  # 构建并安装到隔离的临时 npm 全局目录
 bun run verify:local   # 验证本机 npm 安装、生命周期和真实关闭端点
-bun run publish:npm    # 使用 .env.publish token 将两个包暂存到 npm stage
+bun run publish:npm    # 交互选择版本（默认 patch+1），再将包暂存到 npm stage
 bun run dev:desktop    # 启动 Electrobun 桌面客户端
 bun run build:desktop  # 构建当前平台的未签名开发安装包
 bun run test:desktop:e2e # 真实服务端 + Electrobun 原生发现冒烟

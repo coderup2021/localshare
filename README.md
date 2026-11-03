@@ -117,6 +117,17 @@ bun run publish:npm
 版本并批准到 production。重复执行时会跳过版本和 SHA-1 内容均一致的已
 staged 包；同版本内容不一致会直接报错，避免误发不同构建。
 
+构建前会显示当前版本并提示输入发布版本。直接回车使用默认值，即当前稳定
+版本 patch 加一；也可以输入其他合法 SemVer。非交互环境可显式指定：
+
+```bash
+bun run publish:npm -- 0.2.1
+LOCALSHARE_RELEASE_VERSION=0.2.1 bun run publish:npm
+```
+
+全部包成功 staged 后，源码中的 server 与 npm 主包版本会同步为所选版本，
+供下次发布继续递增；若中途失败则不会修改源码版本。
+
 ```text
 .env.publish
 NPM_ACCESS_TOKEN=<npm granular access token>

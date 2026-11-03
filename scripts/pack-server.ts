@@ -2,6 +2,8 @@ import { chmodSync, cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } fro
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { normalizeReleaseVersion } from './release-version'
+
 type PlatformTarget = {
   platform: string
   arch: string
@@ -26,7 +28,9 @@ if (Bun.semver.order(Bun.version, minimumBunVersion) < 0) {
 const serverPackage = JSON.parse(
   readFileSync(join(root, 'backend', 'server', 'package.json'), 'utf8'),
 ) as { version: string }
-const version = serverPackage.version
+const version = normalizeReleaseVersion(
+  process.env.LOCALSHARE_RELEASE_VERSION ?? serverPackage.version,
+)
 const platformTargets = JSON.parse(
   readFileSync(join(root, 'backend', 'server', 'npm', 'bin', 'platforms.json'), 'utf8'),
 ) as PlatformTarget[]
