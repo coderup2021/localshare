@@ -3,7 +3,8 @@ import react from '@vitejs/plugin-react'
 import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vite'
 
-const apiTarget = 'http://127.0.0.1:5678'
+const apiPort = process.env.LOCALSHARE_API_PORT ?? '5678'
+const apiTarget = `http://127.0.0.1:${apiPort}`
 const adminTarget = 'http://127.0.0.1:7778'
 
 export default defineConfig({

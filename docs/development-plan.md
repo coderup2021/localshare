@@ -363,7 +363,7 @@ CodeGraph 是跨里程碑的强制开发工具：M0 完成仓库根目录初始�
 - 主包名确定为 `localshare-server`，运行时包覆盖 Linux x64/arm64、Windows x64、macOS x64/arm64；全局命令仍为 `localshare`。
 - `bun run pack:server` 生成主包和平台包 tarball，主包不包含源码、测试、本地数据库、上传文件或 CodeGraph。
 - `bun run install:local` 自动构建并使用随机临时 npm prefix 全局安装当前平台的主包和运行时包，生成临时目录下 `localshare-local-current/bin/localshare` 稳定测试入口。
-- `bun run publish:npm` 从被 Git 忽略的 `.env.publish` 读取 granular access token，构建主包和五个平台 tarball，并逐包执行 `npm stage publish`；不提示 2FA，后续由维护者在 npm 平台批准到 production。
+- `bun run publish:npm` 从被 Git 忽略的 `.env.publish` 读取 granular access token，构建主包和五个平台 tarball，并逐包执行 `npm stage publish`；不提示 2FA，后续由维护者在 npm 平台批准到 production。发布要求 Bun 1.4.4+ 和 npm 11.21.1+；重复执行会跳过版本和内容哈希一致的已 staged 包。
 - 主包包含 Node 兼容 CLI、user-web/admin-web 静态产物和 Drizzle migrations；平台包包含 Bun 编译后的独立服务二进制。
 - `start/stop/restart/status/logs` 已实现；首次启动、默认密码提示、端口冲突检查、PID/lock、实例指针、日志和优雅停止均已落地。
 - 已在隔离 npm prefix 中完成全局安装、`--version`、首次 `start`、Web/Admin/API 访问、`8888/ws` 实时消息、`restart` 保留数据、改密后隐藏密码、`stop` 释放端口测试。

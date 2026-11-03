@@ -11,7 +11,8 @@
 
 ## 环境要求
 
-- Bun 1.4+
+- Bun 1.4.4+
+- npm 11.21.1+（仅发布到 npm 时需要）
 - CodeGraph 1.6+（代码图谱和影响分析）
 
 ## 本地开发
@@ -110,7 +111,8 @@ bun run publish:npm
 
 命令从本地 `.env.publish` 读取 `NPM_ACCESS_TOKEN`，不提示 OTP，并按平台包、
 主包顺序执行 `npm stage publish`。随后需要在 npm 包管理页面审核 staged
-版本并批准到 production。
+版本并批准到 production。重复执行时会跳过版本和 SHA-1 内容均一致的已
+staged 包；同版本内容不一致会直接报错，避免误发不同构建。
 
 ```text
 .env.publish

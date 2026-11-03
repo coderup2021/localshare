@@ -15,6 +15,14 @@ const root = fileURLToPath(new URL('..', import.meta.url))
 const releaseRoot = join(root, '.release', 'npm')
 const artifactsDir = join(releaseRoot, 'artifacts')
 const mainDir = join(releaseRoot, 'localshare-server')
+const minimumBunVersion = '1.4.4'
+
+if (Bun.semver.order(Bun.version, minimumBunVersion) < 0) {
+  throw new Error(
+    `Bun ${minimumBunVersion}+ is required to cross-compile Windows with a hidden console; current version: ${Bun.version}`,
+  )
+}
+
 const serverPackage = JSON.parse(
   readFileSync(join(root, 'backend', 'server', 'package.json'), 'utf8'),
 ) as { version: string }
