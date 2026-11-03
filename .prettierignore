@@ -5,3 +5,6 @@ coverage
 .data
 bun.lock
 backend/server/drizzle
+.hutch
+app-desktop/build
+app-desktop/artifacts

@@ -5,7 +5,11 @@ playwright-report/
 test-results/
 .data/
 .e2e-data/
+.desktop-e2e-data/
 .release/
+**/.hutch/
+app-desktop/build/
+app-desktop/artifacts/
 uploads/
 logs/
 .env

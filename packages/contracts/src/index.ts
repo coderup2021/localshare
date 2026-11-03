@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+export * from './discovery'
+
 export const healthStatusSchema = z.object({
   status: z.enum(['ok', 'degraded']),
   service: z.literal('localshare-server'),

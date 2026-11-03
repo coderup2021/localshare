@@ -11,8 +11,11 @@ export default tseslint.config(
       '**/dist/**',
       '**/coverage/**',
       '**/.codegraph/**',
+      '**/.hutch/**',
       '**/.data/**',
       '**/.release/**',
+      'app-desktop/build/**',
+      'app-desktop/artifacts/**',
       'backend/server/drizzle/**',
     ],
   },
@@ -47,7 +50,11 @@ export default tseslint.config(
     },
   },
   {
-    files: ['backend/web-user/src/**/*.tsx', 'backend/web-admin/src/**/*.tsx'],
+    files: [
+      'backend/web-user/src/**/*.tsx',
+      'backend/web-admin/src/**/*.tsx',
+      'app-desktop/src/**/*.tsx',
+    ],
     plugins: {
       'react-hooks': reactHooks,
       'react-refresh': reactRefresh,

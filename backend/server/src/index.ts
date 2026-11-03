@@ -6,6 +6,7 @@ import { loadConfig } from './config/env'
 import { ensureDefaultAdmin, ensurePublicConversation } from './db/bootstrap'
 import { initializeDatabase, isDatabaseReady } from './db/client'
 import { adminAccounts } from './db/schema'
+import { startLanDiscovery, type LanDiscovery } from './discovery/lan-discovery'
 import { AdminAuthService } from './modules/admin-auth/admin-auth.service'
 import { PublicChatService } from './modules/public-chat/public-chat.service'
 import { AttachmentService } from './modules/public-chat/attachment.service'
@@ -57,6 +58,7 @@ const apiServer = Bun.serve({
 })
 
 let webServer: ReturnType<typeof Bun.serve> | undefined
+let lanDiscovery: LanDiscovery | undefined
 
 if (config.mode === 'production') {
   if (!config.webRoot) {
@@ -76,19 +78,51 @@ if (config.mode === 'production') {
   })
 }
 
+if (config.discoveryEnabled) {
+  try {
+    lanDiscovery = await startLanDiscovery({
+      dataDir: config.dataDir,
+      host: config.apiHost,
+      port: config.discoveryPort,
+      webPort: config.webPort,
+      serverVersion: config.serverVersion,
+    })
+  } catch (error) {
+    webServer?.stop()
+    apiServer.stop()
+    database.sqlite.close()
+    throw new Error(
+      `Could not start LocalShare UDP discovery on ${config.apiHost}:${config.discoveryPort}`,
+      {
+        cause: error,
+      },
+    )
+  }
+}
+
 console.log(`LocalShare API listening on http://${config.apiHost}:${config.apiPort}`)
 if (webServer) {
   console.log(`LocalShare Web listening on http://${config.apiHost}:${config.webPort}`)
 }
+if (lanDiscovery) {
+  console.log(
+    `LocalShare discovery listening on udp://${config.apiHost}:${lanDiscovery.address.port}`,
+  )
+}
 console.log(`Data directory: ${config.dataDir}`)
 
-function shutdown(signal: string) {
+let shuttingDown = false
+
+async function shutdown(signal: string) {
+  if (shuttingDown) return
+  shuttingDown = true
   console.log(`Received ${signal}, shutting down`)
   webServer?.stop()
   apiServer.stop()
+  await lanDiscovery?.close()
   database.sqlite.close()
   process.exit(0)
 }
 
-process.on('SIGINT', () => shutdown('SIGINT'))
-process.on('SIGTERM', () => shutdown('SIGTERM'))
+process.on('SIGINT', () => void shutdown('SIGINT'))
+process.on('SIGTERM', () => void shutdown('SIGTERM'))

@@ -1,5 +1,6 @@
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { DISCOVERY_PORT } from '@localshare/contracts'
 import { z } from 'zod'
 
 export const DEVELOPMENT_API_PORT = 5678 as const
@@ -18,6 +19,9 @@ const environmentSchema = z.object({
   LOCALSHARE_WEB_ROOT: z.string().min(1).optional(),
   LOCALSHARE_MIGRATIONS_DIR: z.string().min(1).optional(),
   LOCALSHARE_ADMIN_STATUS_PATH: z.string().min(1).optional(),
+  LOCALSHARE_DISCOVERY_ENABLED: z.enum(['true', 'false']).default('true'),
+  LOCALSHARE_DISCOVERY_PORT: z.coerce.number().int().min(1).max(65_535).default(DISCOVERY_PORT),
+  LOCALSHARE_VERSION: z.string().min(1).max(64).default('dev'),
 })
 
 export type AppConfig = {
@@ -27,6 +31,9 @@ export type AppConfig = {
   mode: 'development' | 'production'
   migrationsDir: string
   webPort: number
+  discoveryEnabled: boolean
+  discoveryPort: number
+  serverVersion: string
   webRoot?: string
   adminStatusPath?: string
 }
@@ -44,6 +51,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     mode: parsed.LOCALSHARE_RUNTIME_MODE,
     migrationsDir: resolve(parsed.LOCALSHARE_MIGRATIONS_DIR ?? defaultMigrationsDir),
     webPort: parsed.LOCALSHARE_WEB_PORT ?? defaultWebPort,
+    discoveryEnabled: parsed.LOCALSHARE_DISCOVERY_ENABLED === 'true',
+    discoveryPort: parsed.LOCALSHARE_DISCOVERY_PORT,
+    serverVersion: parsed.LOCALSHARE_VERSION,
     ...(parsed.LOCALSHARE_WEB_ROOT ? { webRoot: resolve(parsed.LOCALSHARE_WEB_ROOT) } : {}),
     ...(parsed.LOCALSHARE_ADMIN_STATUS_PATH
       ? { adminStatusPath: resolve(parsed.LOCALSHARE_ADMIN_STATUS_PATH) }

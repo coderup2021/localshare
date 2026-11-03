@@ -33,8 +33,15 @@ Production defaults:
 - Web and admin UI: `http://<host>:8888/`
 - Admin UI: `http://<host>:8888/admin/`
 - API and WebSocket: `http://<host>:8887/`
+- Desktop discovery: UDP `49777`
 
 When binding `0.0.0.0`, LocalShare prints the first available LAN IPv4 address.
+
+LocalShare Desktop discovers servers on the same IPv4 broadcast domain by
+sending a versioned query to UDP port `49777`; the service responds by unicast.
+Allow inbound UDP `49777` in the host firewall. Routers, VLAN boundaries,
+guest-network client isolation and strict firewalls can block discovery, in
+which case the desktop app can connect with a manually entered server address.
 
 The first start initializes the database administrator `localShare` with the
 default password `12345678`. Change it after the first login.

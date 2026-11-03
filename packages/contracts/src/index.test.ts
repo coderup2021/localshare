@@ -6,7 +6,10 @@ import {
   adminLoginRequestSchema,
   apiErrorSchema,
   createPublicMessageRequestSchema,
+  discoveryQuerySchema,
+  discoveryResponseSchema,
   healthStatusSchema,
+  isPrivateIPv4Address,
   publicMessageSchema,
   publicMessageSearchResponseSchema,
   publicRealtimeEventSchema,
@@ -34,6 +37,56 @@ describe('API contracts', () => {
     })
 
     expect(parsed.error.code).toBe('ADMIN_UNAUTHORIZED')
+  })
+
+  test('validates desktop discovery queries and responses', () => {
+    const requestId = crypto.randomUUID()
+    expect(
+      discoveryQuerySchema.safeParse({
+        protocol: 'localshare-discovery',
+        version: 1,
+        type: 'query',
+        requestId,
+        client: 'desktop',
+        clientVersion: '0.1.0',
+      }).success,
+    ).toBe(true)
+
+    expect(
+      discoveryResponseSchema.safeParse({
+        protocol: 'localshare-discovery',
+        version: 1,
+        type: 'response',
+        requestId,
+        serverId: crypto.randomUUID(),
+        serverName: 'LocalShare host',
+        serverVersion: '0.2.0',
+        webPort: 8888,
+        capabilities: ['public-chat-v1'],
+        issuedAt: '2026-11-03T10:00:00.000Z',
+      }).success,
+    ).toBe(true)
+  })
+
+  test('rejects unsupported discovery versions', () => {
+    expect(
+      discoveryQuerySchema.safeParse({
+        protocol: 'localshare-discovery',
+        version: 2,
+        type: 'query',
+        requestId: crypto.randomUUID(),
+        client: 'desktop',
+        clientVersion: '0.1.0',
+      }).success,
+    ).toBe(false)
+  })
+
+  test('distinguishes LAN and public IPv4 sources', () => {
+    expect(isPrivateIPv4Address('192.168.1.20')).toBe(true)
+    expect(isPrivateIPv4Address('10.20.30.40')).toBe(true)
+    expect(isPrivateIPv4Address('127.0.0.1')).toBe(true)
+    expect(isPrivateIPv4Address('8.8.8.8')).toBe(false)
+    expect(isPrivateIPv4Address('not-an-ip')).toBe(false)
   })
 
   test('accepts the only supported admin login', () => {

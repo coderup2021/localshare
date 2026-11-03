@@ -1,7 +1,7 @@
 # LocalShare 一期架构
 
-状态：草案（2026-11-02）  
-范围：`server`、`user-web`、`admin-web`
+状态：草案（2026-11-03）
+范围：`server`、`user-web`、`admin-web`、Electrobun `desktop`
 
 ## 1. 目标与成功条件
 
@@ -16,6 +16,7 @@ LocalShare 部署在局域网中的一台主机上，为局域网用户提供本
 - 管理员能删除违规消息、查看存储概况与审计记录。
 - 服务端能在一台主机上完成数据库迁移、附件落盘、静态资源托管、备份和恢复。
 - backend 发布物能以单个 npm 包安装；第三方用户通过 CLI 启动、停止、重启服务，并在首次启动时指定数据目录和 IPv4 监听地址。
+- 桌面客户端能在同一 IPv4 广播域自动发现服务器，选定后加载该服务器的 user-web；无法广播时允许手动地址连接。
 
 ## 2. 系统边界
 
@@ -57,6 +58,7 @@ backend/
   server/                 # Node/Bun 服务，不依赖浏览器环境
   web-user/               # 用户 SPA
   web-admin/              # 管理 SPA
+app-desktop/              # Electrobun 桌面壳、本地发现页和远端 user-web
 packages/
   contracts/              # Zod API schema、错误码、跨端 DTO
   config/                 # 可选的共享 TS/ESLint 配置
@@ -330,7 +332,7 @@ LocalShare 的数据默认留在局域网主机，但“局域网”不是免鉴
 
 ## 13. 后续客户端兼容点
 
-一期不需要实现桌面和移动客户端，但契约应支持：
+桌面客户端已使用 Electrobun 2.0.5 实现，移动客户端仍暂不开发。契约继续支持：
 
 - REST API 版本前缀。
 - 管理员 Cookie 会话与未来可能签发的 Bearer 令牌解耦。
@@ -338,7 +340,7 @@ LocalShare 的数据默认留在局域网主机，但“局域网”不是免鉴
 - 附件通过服务端 URL 而非本地文件路径引用。
 - 客户端能力字段和 API 版本协商。
 
-不要为了“以后可能用到”提前加入复杂插件系统或同步引擎。
+桌面端不在本地复制聊天 UI：本地 React 视图只负责服务器发现和连接，聊天页使用沙箱 WebView 直接加载服务器现有 user-web。该方案保持 Cookie、WebSocket 和附件下载与服务端同源，也不为桌面端维护第二套业务前端。
 
 ## 14. NPM 发布与 CLI 生命周期
 
@@ -376,9 +378,11 @@ localshare --version
     localshare.pid
     localshare.lock
   instance.json
+  server-identity.json
 ```
 
 - `instance.json` 保存活动实例的数据目录、IPv4、版本和启动时间，不保存明文密码或会话令牌。
+- `server-identity.json` 保存首次启动生成的稳定随机 `serverId`，只用于 UDP 发现去重和服务器重连。
 - 用户级 CLI 配置只保存“当前活动实例”的指针，使后续 `stop`/`restart` 能找到数据目录。
 - 数据目录在首次启动时创建并校验可读写；已有数据目录不能被安装或升级清空。
 - `npm install -g` 只写全局包目录；安装过程不得启动服务、初始化数据库或写用户数据。
@@ -430,3 +434,28 @@ Change the default password after first login.
 - `stop` 后进程退出、端口关闭；`restart` 后历史消息和已修改密码保留。
 - 在服务停止时升级 npm 包，再启动同一数据目录，migration 成功且数据不丢失。
 - 启动失败、端口冲突、非法 IPv4、不可写目录均返回非零退出码和可操作错误信息。
+
+## 15. 桌面端与 UDP 自动发现
+
+桌面端启动时优先检查已保存服务器；失效或首次运行时打开本地服务器选择页。只发现一个服务器时，稳定观察到 2 秒后自动进入；多个服务器显示列表。用户可通过原生菜单切换服务器，也可输入根地址手动连接。
+
+发现协议固定使用 IPv4 UDP 端口 `49777`，由共享 Zod 契约维护：
+
+```json
+{
+  "protocol": "localshare-discovery",
+  "version": 1,
+  "type": "query",
+  "requestId": "uuid",
+  "client": "desktop",
+  "clientVersion": "0.1.0"
+}
+```
+
+服务端收到合法查询后单播响应，包含 `serverId`、`serverName`、`serverVersion`、`webPort`、能力列表和 `issuedAt`。客户端使用 UDP 包的来源 IPv4 与 `webPort` 构造 URL，不接受报文声明的其他主机地址。报文最大 1024 字节，服务端按来源限速。
+
+桌面客户端枚举每个非回环 IPv4 网卡并发送定向广播，同时探测回环地址供本机测试。结果按 `serverId` 去重，10 秒未刷新即移除。默认只接受私有、链路本地和回环来源。
+
+广播不跨越路由器、VLAN 或启用了客户端隔离的无线网络。严格防火墙可能阻断 UDP `49777`，此时手动地址始终可用。旧版服务器没有发现响应，也可通过手动地址连接。
+
+聊天窗口必须启用 Electrobun sandbox，不配置 preload 或 RPC，并将导航限制在所选服务器源。跨源链接交给系统浏览器。服务器发现页与远端聊天页使用独立窗口，服务器内容不能获得本地主进程 RPC。

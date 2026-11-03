@@ -7,6 +7,7 @@
 - `backend/server`：Bun + Hono + SQLite + Drizzle API/WebSocket 服务
 - `backend/web-user`：免登录公共频道
 - `backend/web-admin`：管理员端
+- `app-desktop`：Electrobun 桌面客户端，自动发现局域网服务器并复用 user-web
 
 ## 环境要求
 
@@ -31,6 +32,8 @@ Web 入口使用 `7777`，避开 Chromium 对 `6665–6669` 的不安全端口�
 在线客户端通过 `/ws` 实时接收新消息；断线后自动重连，并通过 HTTP 游标历史补齐遗漏消息。
 
 消息支持图片、视频和普通文件，单文件上限 100 MB；附件保存在数据目录的 `uploads/` 下。
+
+服务端默认在 UDP `49777` 响应局域网发现查询。桌面客户端会枚举 IPv4 网卡并发送定向广播，选定服务器后直接打开该服务器的 user-web。跨 VLAN、访客网络隔离或严格防火墙环境可手动输入服务器地址。
 
 首次运行前可从 `.env.example` 创建本地 `.env`。数据库和附件默认保存在仓库根目录
 `.data/`，该目录不会提交。
@@ -114,6 +117,22 @@ tarball、日志或实例配置。
 
 当前发布物支持 Linux x64；不支持平台会明确失败。安装阶段不会启动服务或创建业务数据。
 
+## 桌面端
+
+桌面端使用 Electrobun 2.0.5、Bun、React 和 Vite。开发时先启动 Web 服务，再运行：
+
+```bash
+bun run dev:desktop
+```
+
+构建当前平台的未签名开发包：
+
+```bash
+bun run build:desktop
+```
+
+Electrobun 的完整构建需要对应平台的图形运行库。Linux 构建和原生冒烟要求 glibc 2.38 或更高；仓库 CI 矩阵使用 Ubuntu 24.04、Windows x64、macOS x64 和 macOS arm64。
+
 ## 许可证
 
 LocalShare 使用 [0BSD](LICENSE) 许可证，允许任意使用、修改、分发和商业化，
@@ -124,6 +143,7 @@ LocalShare 使用 [0BSD](LICENSE) 许可证，允许任意使用、修改、分�
 ```bash
 bun run check
 bun run test:e2e
+bun run test:desktop
 ```
 
 `bun run check` 包含单元测试、生产构建和真实 Chrome E2E。代码修改完成后还必须同步 CodeGraph：

@@ -24,6 +24,7 @@ import { createInterface } from 'node:readline/promises'
 
 const API_PORT = 8887
 const WEB_PORT = 8888
+const DISCOVERY_PORT = 49777
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
 const packageJson = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))
 const require = createRequire(import.meta.url)
@@ -219,6 +220,9 @@ function printStarted(instance, adminStatus) {
   console.log(`Web:   http://${host}:${WEB_PORT}/`)
   console.log(`Admin: http://${host}:${WEB_PORT}/admin/`)
   console.log(`API:   http://${host}:${API_PORT}/api/v1`)
+  console.log(
+    `Discovery: udp://${instance.ip}:${process.env.LOCALSHARE_DISCOVERY_PORT ?? DISCOVERY_PORT}`,
+  )
   console.log(`Bind:  ${instance.ip}:${WEB_PORT} (Web), ${instance.ip}:${API_PORT} (API)`)
   console.log(`PID:   ${instance.pid}`)
   if (adminStatus?.mustChangePassword) {
@@ -271,6 +275,7 @@ async function start(dataDirValue, ip, options = {}) {
         LOCALSHARE_WEB_ROOT: join(ROOT, 'resources'),
         LOCALSHARE_MIGRATIONS_DIR: join(ROOT, 'resources', 'drizzle'),
         LOCALSHARE_ADMIN_STATUS_PATH: paths.adminStatus,
+        LOCALSHARE_VERSION: packageJson.version,
       },
       stdio: ['ignore', logFd, logFd],
     })
@@ -429,6 +434,9 @@ async function status() {
   console.log(`Web:    http://${host}:${WEB_PORT}/`)
   console.log(`Admin:  http://${host}:${WEB_PORT}/admin/`)
   console.log(`API:    http://${host}:${API_PORT}/api/v1`)
+  console.log(
+    `Discovery: udp://${instance.ip}:${process.env.LOCALSHARE_DISCOVERY_PORT ?? DISCOVERY_PORT}`,
+  )
 }
 
 function logs() {
