@@ -16,15 +16,15 @@ M0 工程基础、管理员认证、public 实时文本和附件纵切已完成�
 
 ## 当前目录
 
-| 路径                | 用途                                                        | 当前状态                                  |
-| ------------------- | ----------------------------------------------------------- | ----------------------------------------- |
-| `backend/server`    | Bun + Hono 服务、SQLite/Drizzle、CLI；最终打包为 npm 发布物 | 认证、实时消息和附件服务可运行            |
-| `backend/web-user`  | 用户 Web 客户端                                             | 实时文本、图片、视频、文件和重连可运行    |
-| `backend/web-admin` | 管理 Web 客户端                                             | 登录、会话保持、退出和改密界面可运行      |
-| `app-desktop`       | Electrobun 桌面客户端                                       | 自动发现、选择器和远端 user-web 沙箱加载  |
-| `app-mobile`        | 移动客户端                                                  | 暂不开发                                  |
-| `.codegraph/`       | CodeGraph 本地代码索引，不提交、不发布                      | 已初始化；83 个文件、1,081 个节点且已同步 |
-| `docs/`             | 架构、协议、路线图和决策记录                                | 初始化中                                  |
+| 路径                | 用途                                                        | 当前状态                                   |
+| ------------------- | ----------------------------------------------------------- | ------------------------------------------ |
+| `backend/server`    | Bun + Hono 服务、SQLite/Drizzle、CLI；最终打包为 npm 发布物 | 认证、实时消息和附件服务可运行             |
+| `backend/web-user`  | 用户 Web 客户端                                             | 实时文本、图片、视频、文件和重连可运行     |
+| `backend/web-admin` | 管理 Web 客户端                                             | 登录、会话保持、退出和改密界面可运行       |
+| `app-desktop`       | Electrobun 桌面客户端                                       | 自动发现、选择器和远端 user-web 沙箱加载   |
+| `app-mobile`        | 移动客户端                                                  | 暂不开发                                   |
+| `.codegraph/`       | CodeGraph 本地代码索引，不提交、不发布                      | 已初始化；CLI 当前不可用，待安装后重新同步 |
+| `docs/`             | 架构、协议、路线图和决策记录                                | 初始化中                                   |
 
 目录名是当前实际状态。若要调整工作区布局或重命名目录，必须先作为独立改动完成，并同步所有脚本和文档。
 
@@ -145,6 +145,7 @@ bun run db:generate    # 生成 Drizzle migration
 bun run db:migrate     # 应用 migration
 bun run pack:server    # 构建并生成可检查的 npm tarball
 bun run install:local  # 构建并安装到隔离的临时 npm 全局目录
+bun run verify:local   # 验证本机 npm 安装、生命周期和真实关闭端点
 bun run publish:npm    # 使用 .env.publish token 将两个包暂存到 npm stage
 bun run dev:desktop    # 启动 Electrobun 桌面客户端
 bun run build:desktop  # 构建当前平台的未签名开发安装包
@@ -263,8 +264,8 @@ backend/server/src/
 
 ## 当前下一步
 
-public 实时消息、附件、npm 发布候选、Electrobun 桌面端与 IPv4 UDP 自动发现已经完成。桌面端在 Linux x64、Windows x64、macOS x64 和 macOS arm64 使用未签名开发构建；下一步完成 Windows/macOS npm 原生安装冒烟、三平台真实桌面安装包验收并进入管理能力。
+public 实时消息、附件、npm 发布候选、Electrobun 桌面端与 IPv4 UDP 自动发现已经完成。桌面端在 Linux x64、Windows x64、macOS x64 和 macOS arm64 使用未签名开发构建；Windows/macOS npm 原生安装冒烟和四目标桌面 E2E 已纳入 CI 矩阵，下一步确认首次远端运行结果并进入管理能力。
 
-跨平台 npm 发布候选、生产 `8887/8888` 双端口服务和 `localshare` 生命周期 CLI 已实现。Linux x64 已完成原生 npm 安装验证；Windows/macOS 已完成交叉编译和二进制格式检查，原生安装冒烟仍需在对应系统执行。实际 npm registry 发布仍需要账号认证。
+跨平台 npm 发布候选、生产 `8887/8888` 双端口服务和 `localshare` 生命周期 CLI 已实现。Linux x64 已在当前环境完成原生 npm 安装验证；Windows/macOS 已完成交叉编译和二进制格式检查，并加入原生安装与桌面 E2E 的 CI 矩阵。实际 npm registry 发布仍需要账号认证。
 
 项目与 npm 发布物统一采用 `0BSD` 许可证，允许无条件使用、修改、分发和商业化。

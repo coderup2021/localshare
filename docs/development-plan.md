@@ -367,9 +367,12 @@ CodeGraph 是跨里程碑的强制开发工具：M0 完成仓库根目录初始�
 - `bun run publish:npm` 从被 Git 忽略的 `.env.publish` 读取 granular access token，构建主包和五个平台 tarball，并逐包执行 `npm stage publish`；不提示 2FA，后续由维护者在 npm 平台批准到 production。发布要求 Bun 1.4.4+ 和 npm 11.21.1+；重复执行会跳过版本和内容哈希一致的已 staged 包。
 - 主包包含 Node 兼容 CLI、user-web/admin-web 静态产物和 Drizzle migrations；平台包包含 Bun 编译后的独立服务二进制。
 - `start/stop/restart/status/logs` 已实现；首次启动、默认密码提示、端口冲突检查、PID/lock、实例指针、日志和优雅停止均已落地。
+- `stop`/`restart` 使用每次启动生成的私有控制令牌调用跨平台优雅关闭端点，避免 Windows 缺少 POSIX 信号导致直接杀进程；旧实例或端点不可用时保留信号与 `taskkill` 回退。
+- `bun run verify:local` 验证本机 npm 安装布局、Node 兼容 CLI、`start → status → restart → stop`、Web/Admin/API 可访问以及控制端点确实收到关闭请求。
 - 已在隔离 npm prefix 中完成全局安装、`--version`、首次 `start`、Web/Admin/API 访问、`8888/ws` 实时消息、`restart` 保留数据、改密后隐藏密码、`stop` 释放端口测试。
 - `bun build --compile --target=...` 已交叉生成 Linux ELF、Windows PE32+ 和 macOS Mach-O 二进制；主包按平台自动安装对应 optional dependency。实际 `npm publish` 仍需 npm 账号认证和 registry 权限。
-- Linux x64 已完成原生 npm 安装、生命周期和浏览器发送验证；Windows/macOS 原生安装冒烟仍需在对应操作系统执行。
+- Server CI 已加入 Linux x64/arm64、Windows x64、macOS x64/arm64 的真实 Chrome E2E、原生 npm 安装和生命周期矩阵；桌面 CI 已把真实 Electrobun E2E 扩展到四个目标平台，首次远端执行结果仍需确认。
+- 服务端 URL 到文件路径转换统一使用 `fileURLToPath`，静态资源与附件读取共用跨平台根目录包含校验；覆盖 Windows 盘符、反斜杠、同前缀目录和跨盘符逃逸。
 - 主包和平台包使用 `0BSD` 许可证，允许任意使用、修改、分发和商业化，无署名或衍生作品开源要求。
 
 ## 10. M7 Electrobun 桌面端与自动发现（已实现 2026-11-03）
@@ -489,4 +492,4 @@ CodeGraph 是跨里程碑的强制开发工具：M0 完成仓库根目录初始�
 
 ## 15. 当前行动
 
-M0、管理员认证、public 实时文本、附件、跨平台 npm 发布候选、Electrobun 桌面端和 IPv4 UDP 自动发现均已完成。下一步在 Windows 和 macOS 执行 npm 原生安装冒烟，并在四个桌面目标平台完成原生窗口冒烟，再进入管理能力：补齐审计日志、消息软删除、存储概况和孤立附件清理，随后完善已读位置。
+M0、管理员认证、public 实时文本、附件、跨平台 npm 发布候选、Electrobun 桌面端和 IPv4 UDP 自动发现均已完成，跨平台原生安装与桌面 E2E 矩阵已补齐。下一步确认四个 CI 目标平台的首次运行结果，再进入管理能力：补齐审计日志、消息软删除、存储概况和孤立附件清理，随后完善已读位置。

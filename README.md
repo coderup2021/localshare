@@ -95,6 +95,7 @@ bun run pack:server
 
 ```bash
 bun run install:local
+bun run verify:local
 ```
 
 命令完成后可通过固定的最新安装入口运行：
@@ -102,6 +103,8 @@ bun run install:local
 ```bash
 /tmp/localshare-local-current/bin/localshare start
 ```
+
+Windows 使用 `%TEMP%\localshare-local-current\bin\localshare.cmd start`。
 
 发布到官方 npm registry：
 
@@ -138,7 +141,7 @@ bun run dev:desktop
 bun run build:desktop
 ```
 
-Electrobun 的完整构建需要对应平台的图形运行库。Linux 构建和原生冒烟要求 glibc 2.38 或更高；仓库 CI 矩阵使用 Ubuntu 24.04、Windows x64、macOS x64 和 macOS arm64。
+Electrobun 的完整构建需要对应平台的图形运行库。Linux 构建和原生冒烟要求 glibc 2.38 或更高；仓库 CI 矩阵使用 Ubuntu 24.04、Windows 2022 x64、macOS 15 Intel 和 macOS 15 arm64。
 
 ## 许可证
 
@@ -151,6 +154,7 @@ LocalShare 使用 [0BSD](LICENSE) 许可证，允许任意使用、修改、分�
 bun run check
 bun run test:e2e
 bun run test:desktop
+bun run verify:local  # 先运行 install:local；验证本机 npm 安装和生命周期
 ```
 
 `bun run check` 包含单元测试、生产构建和真实 Chrome E2E。代码修改完成后还必须同步 CodeGraph：

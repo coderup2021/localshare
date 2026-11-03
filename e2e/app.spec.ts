@@ -2,6 +2,8 @@ import { networkInterfaces } from 'node:os'
 import { expect, test, type Page } from '@playwright/test'
 
 const baseURL = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:7777'
+const expectedApiPort = process.env.LOCALSHARE_API_PORT ?? '5678'
+const displayedApiPort = new Intl.NumberFormat('en-US').format(Number(expectedApiPort))
 
 function lanBaseURL() {
   const configured = new URL(baseURL)
@@ -302,6 +304,7 @@ test('admin logs in through /admin and reaches the API', async ({ page }) => {
   await expect(page.getByRole('heading', { name: '工程概览' })).toBeVisible()
   await expect(page.getByText('服务在线')).toBeVisible()
   await expect(page.getByText('管理员账户')).toBeVisible()
+  await expect(page.getByText(displayedApiPort, { exact: true })).toBeVisible()
 
   await page.reload()
   await expect(page.getByRole('heading', { name: '工程概览' })).toBeVisible()

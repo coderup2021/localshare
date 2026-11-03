@@ -48,6 +48,8 @@ const app = createApp({
   publicChat,
   publicChatHub,
   attachments,
+  ...(config.controlToken ? { controlToken: config.controlToken } : {}),
+  requestShutdown: () => void shutdown('control'),
 })
 
 const apiServer = Bun.serve({
@@ -124,5 +126,9 @@ async function shutdown(signal: string) {
   process.exit(0)
 }
 
-process.on('SIGINT', () => void shutdown('SIGINT'))
-process.on('SIGTERM', () => void shutdown('SIGTERM'))
+for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+  process.on(signal, () => void shutdown(signal))
+}
+if (process.platform === 'win32') {
+  process.on('SIGBREAK', () => void shutdown('SIGBREAK'))
+}

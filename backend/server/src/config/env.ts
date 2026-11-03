@@ -19,6 +19,7 @@ const environmentSchema = z.object({
   LOCALSHARE_WEB_ROOT: z.string().min(1).optional(),
   LOCALSHARE_MIGRATIONS_DIR: z.string().min(1).optional(),
   LOCALSHARE_ADMIN_STATUS_PATH: z.string().min(1).optional(),
+  LOCALSHARE_CONTROL_TOKEN: z.string().min(16).max(256).optional(),
   LOCALSHARE_DISCOVERY_ENABLED: z.enum(['true', 'false']).default('true'),
   LOCALSHARE_DISCOVERY_PORT: z.coerce.number().int().min(1).max(65_535).default(DISCOVERY_PORT),
   LOCALSHARE_VERSION: z.string().min(1).max(64).default('dev'),
@@ -36,6 +37,7 @@ export type AppConfig = {
   serverVersion: string
   webRoot?: string
   adminStatusPath?: string
+  controlToken?: string
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
@@ -58,5 +60,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     ...(parsed.LOCALSHARE_ADMIN_STATUS_PATH
       ? { adminStatusPath: resolve(parsed.LOCALSHARE_ADMIN_STATUS_PATH) }
       : {}),
+    ...(parsed.LOCALSHARE_CONTROL_TOKEN ? { controlToken: parsed.LOCALSHARE_CONTROL_TOKEN } : {}),
   }
 }

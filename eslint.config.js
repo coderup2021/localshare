@@ -12,6 +12,7 @@ export default tseslint.config(
       '**/coverage/**',
       '**/.codegraph/**',
       '**/.hutch/**',
+      '**/.cottontail-tmp/**',
       '**/.data/**',
       '**/.release/**',
       'app-desktop/build/**',

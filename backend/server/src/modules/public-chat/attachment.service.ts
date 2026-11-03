@@ -1,38 +1,16 @@
 import { mkdirSync, rmSync } from 'node:fs'
-import { basename, extname, isAbsolute, relative, resolve, sep } from 'node:path'
+import { basename, extname, resolve } from 'node:path'
 import type { PublicAttachment } from '@localshare/contracts'
 import { and, eq, inArray, isNull } from 'drizzle-orm'
 
 import type { DatabaseClient } from '../../db/client'
 import { anonymousVisitors, attachments, messages } from '../../db/schema'
 import { HttpError } from '../../shared/http-error'
+import { isPathWithin } from '../../shared/path'
 
 export const MAX_ATTACHMENT_BYTES = 100 * 1024 * 1024
 
 type AttachmentRow = typeof attachments.$inferSelect
-type PathApi = {
-  isAbsolute: typeof isAbsolute
-  relative: typeof relative
-  sep: typeof sep
-}
-
-export function isPathWithin(
-  root: string,
-  candidate: string,
-  paths: PathApi = {
-    isAbsolute,
-    relative,
-    sep,
-  },
-) {
-  const relativePath = paths.relative(root, candidate)
-  return (
-    relativePath !== '' &&
-    relativePath !== '..' &&
-    !relativePath.startsWith(`..${paths.sep}`) &&
-    !paths.isAbsolute(relativePath)
-  )
-}
 
 function attachmentKind(mimeType: string): PublicAttachment['kind'] {
   const inlineImages = new Set([

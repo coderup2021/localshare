@@ -35,11 +35,13 @@ describe('server configuration', () => {
     const config = loadConfig({
       LOCALSHARE_DISCOVERY_ENABLED: 'false',
       LOCALSHARE_DISCOVERY_PORT: '49888',
+      LOCALSHARE_CONTROL_TOKEN: 'local-control-token',
       LOCALSHARE_VERSION: '0.2.0',
     })
 
     expect(config.discoveryEnabled).toBe(false)
     expect(config.discoveryPort).toBe(49_888)
+    expect(config.controlToken).toBe('local-control-token')
     expect(config.serverVersion).toBe('0.2.0')
   })
 })

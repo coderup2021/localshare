@@ -14,6 +14,7 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { spawn, spawnSync } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
 import { createRequire } from 'node:module'
 import { networkInterfaces, homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -46,7 +47,7 @@ function readJson(path) {
 function writeJson(path, value) {
   mkdirSync(dirname(path), { recursive: true })
   const temporary = `${path}.${process.pid}.tmp`
-  writeFileSync(temporary, `${JSON.stringify(value, null, 2)}\n`)
+  writeFileSync(temporary, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 })
   renameSync(temporary, path)
 }
 
@@ -93,14 +94,27 @@ function probeHost(ip) {
   return ip === '0.0.0.0' ? '127.0.0.1' : ip
 }
 
-function displayHost(ip) {
-  if (ip !== '0.0.0.0') return ip
-  const lanAddress = localIPv4Addresses().find((address) => !address.startsWith('127.'))
-  return lanAddress ?? '127.0.0.1'
+function displayHosts(ip) {
+  if (ip !== '0.0.0.0') return [ip]
+  const lanAddresses = Array.from(new Set(localIPv4Addresses())).filter(
+    (address) => !address.startsWith('127.'),
+  )
+  const routedAddresses = lanAddresses.filter((address) => !address.startsWith('169.254.'))
+  return routedAddresses.length > 0
+    ? routedAddresses
+    : lanAddresses.length > 0
+      ? lanAddresses
+      : ['127.0.0.1']
 }
 
 function prepareDataDir(value) {
-  const dataDir = resolve(value)
+  const expanded =
+    value === '~'
+      ? homedir()
+      : value.startsWith('~/') || value.startsWith('~\\')
+        ? join(homedir(), value.slice(2))
+        : value
+  const dataDir = resolve(expanded)
   mkdirSync(dataDir, { recursive: true })
   try {
     accessSync(dataDir, constants.R_OK | constants.W_OK)
@@ -159,6 +173,28 @@ function terminateProcess(pid, force = false) {
     return
   }
   process.kill(pid, force ? 'SIGKILL' : 'SIGTERM')
+}
+
+async function requestGracefulShutdown(instance) {
+  if (typeof instance.controlToken !== 'string' || instance.controlToken.length < 16) return false
+
+  const apiPort = Number.isInteger(instance.apiPort) ? instance.apiPort : API_PORT
+  try {
+    const response = await fetch(
+      `http://${probeHost(instance.ip)}:${apiPort}/api/v1/control/shutdown`,
+      {
+        method: 'POST',
+        redirect: 'manual',
+        headers: {
+          'x-localshare-control-token': instance.controlToken,
+        },
+        signal: AbortSignal.timeout(2_000),
+      },
+    )
+    return response.status === 202
+  } catch {
+    return false
+  }
 }
 
 function readCurrentInstance() {
@@ -248,11 +284,15 @@ async function waitForHealth(instance, child, logPath) {
 }
 
 function printStarted(instance, adminStatus) {
-  const host = displayHost(instance.ip)
+  const hosts = displayHosts(instance.ip)
   console.log('LocalShare started')
-  console.log(`Web:   http://${host}:${WEB_PORT}/`)
-  console.log(`Admin: http://${host}:${WEB_PORT}/admin/`)
-  console.log(`API:   http://${host}:${API_PORT}/api/v1`)
+  console.log(`Web:   ${hosts.map((host) => `http://${host}:${WEB_PORT}/`).join('\n       ')}`)
+  console.log(
+    `Admin: ${hosts.map((host) => `http://${host}:${WEB_PORT}/admin/`).join('\n       ')}`,
+  )
+  console.log(
+    `API:   ${hosts.map((host) => `http://${host}:${API_PORT}/api/v1`).join('\n       ')}`,
+  )
   console.log(
     `Discovery: udp://${instance.ip}:${process.env.LOCALSHARE_DISCOVERY_PORT ?? DISCOVERY_PORT}`,
   )
@@ -294,6 +334,7 @@ async function start(dataDirValue, ip, options = {}) {
 
   appendFileSync(paths.log, `\n[${new Date().toISOString()}] starting LocalShare\n`)
   const logFd = openSync(paths.log, 'a')
+  const controlToken = randomUUID()
   let child
   try {
     child = spawn(binaryPath(), [], {
@@ -309,6 +350,7 @@ async function start(dataDirValue, ip, options = {}) {
         LOCALSHARE_WEB_ROOT: join(ROOT, 'resources'),
         LOCALSHARE_MIGRATIONS_DIR: join(ROOT, 'resources', 'drizzle'),
         LOCALSHARE_ADMIN_STATUS_PATH: paths.adminStatus,
+        LOCALSHARE_CONTROL_TOKEN: controlToken,
         LOCALSHARE_VERSION: packageJson.version,
       },
       stdio: ['ignore', logFd, logFd],
@@ -329,6 +371,7 @@ async function start(dataDirValue, ip, options = {}) {
     ip,
     apiPort: API_PORT,
     webPort: WEB_PORT,
+    controlToken,
     startedAt: new Date().toISOString(),
   }
   writeJson(join(dataDir, 'instance.json'), instance)
@@ -377,10 +420,13 @@ async function stop(options = {}) {
     fail(`PID ${instance.pid} no longer belongs to LocalShare; refusing to stop it.`)
   }
 
-  terminateProcess(instance.pid)
+  const requestedGracefulShutdown = await requestGracefulShutdown(instance)
+  if (!requestedGracefulShutdown) terminateProcess(instance.pid)
   if (!(await waitForExit(instance.pid, 10_000))) {
     terminateProcess(instance.pid, true)
-    await waitForExit(instance.pid, 3_000)
+    if (!(await waitForExit(instance.pid, 3_000))) {
+      fail(`LocalShare process ${instance.pid} did not exit`)
+    }
   }
   cleanStaleRuntime(paths)
   if (!options.quiet) console.log(`LocalShare stopped (PID ${instance.pid}).`)
@@ -446,7 +492,7 @@ async function status() {
   }
 
   let health = 'unreachable'
-  const host = displayHost(instance.ip)
+  const hosts = displayHosts(instance.ip)
   try {
     const response = await fetch(
       `http://${probeHost(instance.ip)}:${API_PORT}/api/v1/health/ready`,
@@ -465,9 +511,13 @@ async function status() {
   console.log(`Version: ${instance.version}`)
   console.log(`Data:   ${instance.dataDir}`)
   console.log(`IP:     ${instance.ip}`)
-  console.log(`Web:    http://${host}:${WEB_PORT}/`)
-  console.log(`Admin:  http://${host}:${WEB_PORT}/admin/`)
-  console.log(`API:    http://${host}:${API_PORT}/api/v1`)
+  console.log(`Web:    ${hosts.map((host) => `http://${host}:${WEB_PORT}/`).join('\n        ')}`)
+  console.log(
+    `Admin:  ${hosts.map((host) => `http://${host}:${WEB_PORT}/admin/`).join('\n        ')}`,
+  )
+  console.log(
+    `API:    ${hosts.map((host) => `http://${host}:${API_PORT}/api/v1`).join('\n        ')}`,
+  )
   console.log(
     `Discovery: udp://${instance.ip}:${process.env.LOCALSHARE_DISCOVERY_PORT ?? DISCOVERY_PORT}`,
   )

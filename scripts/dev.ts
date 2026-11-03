@@ -1,6 +1,7 @@
 import { resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-const root = new URL('..', import.meta.url).pathname
+const root = fileURLToPath(new URL('..', import.meta.url))
 const bun = Bun.which('bun') ?? process.execPath
 
 const applications = [
@@ -27,13 +28,23 @@ function stopAll(signal: NodeJS.Signals = 'SIGTERM') {
 
   for (const child of children) {
     if (child.process.exitCode === null) {
-      child.process.kill(signal)
+      if (process.platform === 'win32') {
+        Bun.spawnSync(['taskkill', '/PID', String(child.process.pid), '/T', '/F'], {
+          stdout: 'ignore',
+          stderr: 'ignore',
+        })
+      } else {
+        child.process.kill(signal)
+      }
     }
   }
 }
 
 process.on('SIGINT', () => stopAll('SIGINT'))
 process.on('SIGTERM', () => stopAll('SIGTERM'))
+if (process.platform === 'win32') {
+  process.on('SIGBREAK', () => stopAll('SIGTERM'))
+}
 
 const exitCodes = await Promise.all(children.map((child) => child.process.exited))
 stopAll()

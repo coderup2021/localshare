@@ -17,7 +17,7 @@ export function AdminDashboard() {
   const healthError = useServiceStore((service) => service.error)
   const checkHealth = useServiceStore((service) => service.check)
   const webPort = window.location.port || (window.location.protocol === 'https:' ? '443' : '80')
-  const apiPort = webPort === '8888' ? '8887' : '5678'
+  const apiPort = webPort === '8888' ? '8887' : __LOCALSHARE_API_PORT__
 
   useEffect(() => {
     void checkHealth()

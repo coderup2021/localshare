@@ -1,4 +1,6 @@
-import { extname, resolve, sep } from 'node:path'
+import { extname, resolve } from 'node:path'
+
+import { isPathWithin } from '../shared/path'
 
 type WebHandlerOptions = {
   app: {
@@ -11,7 +13,7 @@ type WebHandlerOptions = {
 function resolveStaticPath(root: string, pathname: string) {
   const normalized = pathname.replace(/^\/+/, '')
   const path = resolve(root, normalized)
-  if (path !== root && !path.startsWith(`${root}${sep}`)) return null
+  if (path !== root && !isPathWithin(root, path)) return null
   return path
 }
 

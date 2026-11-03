@@ -374,3 +374,8 @@ process.on('SIGINT', () => {
 process.on('SIGTERM', () => {
   void discovery?.stop().finally(() => process.exit(143))
 })
+if (process.platform === 'win32') {
+  process.on('SIGBREAK', () => {
+    void discovery?.stop().finally(() => process.exit(143))
+  })
+}

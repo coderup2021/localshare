@@ -32,6 +32,12 @@ Non-interactive configuration is also supported:
 localshare start --data-dir /srv/localshare --ip 0.0.0.0
 ```
 
+Windows PowerShell example:
+
+```powershell
+localshare start --data-dir "$env:USERPROFILE\LocalShare" --ip 0.0.0.0
+```
+
 Production defaults:
 
 - Web and admin UI: `http://<host>:8888/`
@@ -39,7 +45,8 @@ Production defaults:
 - API and WebSocket: `http://<host>:8887/`
 - Desktop discovery: UDP `49777`
 
-When binding `0.0.0.0`, LocalShare prints the first available LAN IPv4 address.
+When binding `0.0.0.0`, LocalShare prints every available non-loopback IPv4
+address so VPN or virtual adapters do not hide the LAN address.
 
 LocalShare Desktop discovers servers on the same IPv4 broadcast domain by
 sending a versioned query to UDP port `49777`; the service responds by unicast.

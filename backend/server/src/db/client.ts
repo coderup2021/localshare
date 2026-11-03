@@ -1,5 +1,6 @@
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { Database } from 'bun:sqlite'
 import { drizzle, type BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite'
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator'
@@ -27,7 +28,7 @@ export function openDatabase(dataDir: string): DatabaseClient {
 
 export function initializeDatabase(dataDir: string, migrationsDir?: string): DatabaseClient {
   const client = openDatabase(dataDir)
-  const migrationsFolder = migrationsDir ?? new URL('../../drizzle', import.meta.url).pathname
+  const migrationsFolder = migrationsDir ?? fileURLToPath(new URL('../../drizzle', import.meta.url))
 
   migrate(client.db, { migrationsFolder })
   return client

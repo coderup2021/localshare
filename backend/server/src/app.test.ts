@@ -46,4 +46,38 @@ describe('health routes', () => {
       error: { code: 'NOT_FOUND' },
     })
   })
+
+  test('requires the control token before requesting shutdown', async () => {
+    let shutdownRequested = false
+    const app = createApp({
+      isDatabaseReady: () => true,
+      controlToken: 'local-control-token',
+      requestShutdown: () => {
+        shutdownRequested = true
+      },
+    })
+
+    const unauthorized = await app.request('/api/v1/control/shutdown', {
+      method: 'POST',
+      headers: { 'x-localshare-control-token': 'wrong-control-token' },
+    })
+    expect(unauthorized.status).toBe(403)
+    expect(await unauthorized.json()).toMatchObject({
+      error: { code: 'CONTROL_FORBIDDEN' },
+    })
+
+    const malformedToken = await app.request('/api/v1/control/shutdown', {
+      method: 'POST',
+      headers: { 'x-localshare-control-token': 'é'.repeat('local-control-token'.length) },
+    })
+    expect(malformedToken.status).toBe(403)
+
+    const accepted = await app.request('/api/v1/control/shutdown', {
+      method: 'POST',
+      headers: { 'x-localshare-control-token': 'local-control-token' },
+    })
+    expect(accepted.status).toBe(202)
+    await Bun.sleep(40)
+    expect(shutdownRequested).toBe(true)
+  })
 })

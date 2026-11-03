@@ -76,12 +76,14 @@ if (!installedCommand) {
 }
 
 if (isWindows) {
+  const batchConfigDir = configDir.replaceAll('%', '%%')
+  const batchInstalledCommand = installedCommand.replaceAll('%', '%%')
   writeFileSync(
     wrapperPath,
     [
       '@echo off',
-      `if not defined LOCALSHARE_CONFIG_DIR set "LOCALSHARE_CONFIG_DIR=${configDir}"`,
-      `call "${installedCommand}" %*`,
+      `if not defined LOCALSHARE_CONFIG_DIR set "LOCALSHARE_CONFIG_DIR=${batchConfigDir}"`,
+      `call "${batchInstalledCommand}" %*`,
       '',
     ].join('\r\n'),
   )
@@ -90,7 +92,9 @@ if (isWindows) {
     wrapperPath,
     [
       '#!/bin/sh',
-      `export LOCALSHARE_CONFIG_DIR="\${LOCALSHARE_CONFIG_DIR:-${configDir}}"`,
+      `if [ -z "\${LOCALSHARE_CONFIG_DIR:-}" ]; then`,
+      `  export LOCALSHARE_CONFIG_DIR=${shellQuote(configDir)}`,
+      'fi',
       `exec ${shellQuote(installedCommand)} "$@"`,
       '',
     ].join('\n'),

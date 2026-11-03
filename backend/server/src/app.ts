@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto'
 import { apiErrorSchema, healthStatusSchema } from '@localshare/contracts'
 import { Hono } from 'hono'
 import { upgradeWebSocket } from 'hono/bun'
@@ -17,6 +18,17 @@ type AppDependencies = {
   publicChat?: PublicChatService
   publicChatHub?: PublicChatHub
   attachments?: AttachmentService
+  controlToken?: string
+  requestShutdown?: () => void
+}
+
+function controlTokensMatch(expected: string, provided: string | undefined) {
+  if (!provided) return false
+  const expectedBytes = Buffer.from(expected)
+  const providedBytes = Buffer.from(provided)
+  return (
+    expectedBytes.length === providedBytes.length && timingSafeEqual(expectedBytes, providedBytes)
+  )
 }
 
 export function createApp(dependencies: AppDependencies) {
@@ -99,6 +111,19 @@ export function createApp(dependencies: AppDependencies) {
         }
       }),
     )
+  }
+
+  const controlToken = dependencies.controlToken
+  const requestShutdown = dependencies.requestShutdown
+  if (controlToken && requestShutdown) {
+    app.post('/api/v1/control/shutdown', (context) => {
+      if (!controlTokensMatch(controlToken, context.req.header('x-localshare-control-token'))) {
+        throw new HttpError('CONTROL_FORBIDDEN', 403, 'Invalid control token')
+      }
+
+      setTimeout(requestShutdown, 25)
+      return context.body(null, 202)
+    })
   }
 
   app.notFound((context) => {

@@ -8,6 +8,7 @@ test-results/
 .desktop-e2e-data/
 .release/
 **/.hutch/
+**/.cottontail-tmp/
 app-desktop/build/
 app-desktop/artifacts/
 uploads/

@@ -1,3 +1,4 @@
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'drizzle-kit'
 
@@ -8,6 +9,8 @@ export default defineConfig({
   out: './drizzle',
   dialect: 'sqlite',
   dbCredentials: {
-    url: process.env.DATA_DIR ? `${process.env.DATA_DIR}/localshare.sqlite` : defaultDatabaseUrl,
+    url: process.env.DATA_DIR
+      ? join(process.env.DATA_DIR, 'localshare.sqlite')
+      : defaultDatabaseUrl,
   },
 })

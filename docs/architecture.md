@@ -365,7 +365,7 @@ localshare --version
 
 发布方案采用 `bun build --compile` 生成各平台独立二进制，并通过 npm 平台 `optionalDependencies` 分发。当前矩阵为 Linux x64/arm64、Windows x64、macOS x64/arm64。上层 npm 包提供 Node 兼容的 `localshare` 启动器，根据 `process.platform` 和 `process.arch` 选择包及二进制名称；Windows 平台包使用 `.exe`。用户安装 npm 包后不需要额外安装 Bun。暂时不支持的平台必须在安装或首次执行时明确报错，不能静默安装后启动失败。
 
-平台包通过 Bun `--target` 从 Linux 构建机交叉编译；发布前至少检查 ELF、PE32+ 和 Mach-O 架构。Linux/macOS 使用 `SIGTERM` 后 `SIGKILL` 停止服务，Windows 使用 `process.kill` 并在超时后以 `taskkill /T /F` 清理进程树。进程归属判断分别使用 `/proc`、`ps` 和 `tasklist`，不得仅凭 PID 存活就停止进程。
+平台包通过 Bun `--target` 从构建机交叉编译；发布前至少检查 ELF、PE32+ 和 Mach-O 架构。CLI 为每次启动生成独立控制令牌并写入权限受限的实例文件，`stop`/`restart` 优先调用本机控制端点完成跨平台优雅关闭；端点不可用时再回退到 `SIGTERM`/`SIGKILL`，Windows 超时后以 `taskkill /T /F` 清理进程树。进程归属判断分别使用 `/proc`、`ps` 和 `tasklist`，不得仅凭 PID 存活就停止进程。
 
 ### 14.2 数据目录
 
@@ -383,7 +383,7 @@ localshare --version
   server-identity.json
 ```
 
-- `instance.json` 保存活动实例的数据目录、IPv4、版本和启动时间，不保存明文密码或会话令牌。
+- `instance.json` 保存活动实例的数据目录、IPv4、版本、启动时间以及仅用于本机生命周期控制的随机令牌；该文件按私有权限写入，不保存管理员密码或管理员会话令牌。控制端点只接受精确令牌，令牌缺失或不匹配时返回 403。
 - `server-identity.json` 保存首次启动生成的稳定随机 `serverId`，只用于 UDP 发现去重和服务器重连。
 - 用户级 CLI 配置只保存“当前活动实例”的指针，使后续 `stop`/`restart` 能找到数据目录。
 - 数据目录在首次启动时创建并校验可读写；已有数据目录不能被安装或升级清空。
