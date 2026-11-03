@@ -87,18 +87,11 @@ button:disabled {
 }
 
 .brand-mark {
-  display: grid;
+  display: block;
   flex: 0 0 auto;
-  width: 48px;
-  height: 48px;
-  place-items: center;
-  border-radius: 15px;
-  color: #fff;
-  background: linear-gradient(145deg, #2f7b55, #1f5e3e);
-  box-shadow: 0 9px 22px rgb(31 94 62 / 22%);
-  font-size: 15px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
+  width: 52px;
+  height: 52px;
+  filter: drop-shadow(0 9px 18px rgb(31 94 62 / 20%));
 }
 
 .eyebrow {

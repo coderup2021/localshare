@@ -36,6 +36,10 @@ This produces portable, Setup ZIP, standalone Setup EXE and update artifacts in
 to be verified on a Windows host. The canary portable archive extracts to
 `LocalShareDesktop-canary/`; run `LocalShareDesktop-canary/bin/launcher.exe`.
 
+App icons use the canonical SVG at `../assets/brand/localshare-icon.svg`.
+After editing it, run `bun run brand:generate` from the repository root to
+regenerate the macOS iconset, Windows ICO and Linux PNG assets.
+
 The default build uses the canary channel and is intentionally unsigned. Use a
 supported host for each target:
 

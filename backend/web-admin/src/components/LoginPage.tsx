@@ -31,7 +31,7 @@ export function LoginPage() {
     <main className="login-shell">
       <Card className="login-card" variant="borderless">
         <div className="login-brand">
-          <span className="login-mark">LS</span>
+          <img className="login-mark" src="/admin/favicon.svg" alt="" aria-hidden="true" />
           <div>
             <Typography.Title level={2} className="login-title">
               管理员登录

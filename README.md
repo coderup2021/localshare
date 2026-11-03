@@ -152,6 +152,14 @@ bun run dev:desktop
 bun run build:desktop
 ```
 
+Logo 的 SVG 主文件位于 `assets/brand/localshare-icon.svg`。修改主文件后，在
+macOS 上运行以下命令，同步 Web favicon、Desktop 页面图标及 macOS/Windows/Linux
+安装包图标：
+
+```bash
+bun run brand:generate
+```
+
 在 macOS 上交叉组装 Windows x64 便携包和安装器：
 
 ```bash

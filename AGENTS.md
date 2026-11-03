@@ -23,6 +23,7 @@ M0 工程基础、管理员认证、public 实时文本和附件纵切已完成�
 | `backend/web-admin` | 管理 Web 客户端                                             | 登录、会话保持、退出和改密界面可运行       |
 | `app-desktop`       | Electrobun 桌面客户端                                       | 自动发现、选择器和远端 user-web 沙箱加载   |
 | `app-mobile`        | 移动客户端                                                  | 暂不开发                                   |
+| `assets/brand`      | Web 与桌面端品牌图标矢量源                                  | LocalShare 品牌图标单一来源                |
 | `.codegraph/`       | CodeGraph 本地代码索引，不提交、不发布                      | 已初始化；CLI 当前不可用，待安装后重新同步 |
 | `docs/`             | 架构、协议、路线图和决策记录                                | 初始化中                                   |
 
@@ -147,6 +148,7 @@ bun run pack:server    # 构建并生成可检查的 npm tarball
 bun run install:local  # 构建并安装到隔离的临时 npm 全局目录
 bun run verify:local   # 验证本机 npm 安装、生命周期和真实关闭端点
 bun run publish:npm    # 交互选择版本（默认 patch+1），再将包暂存到 npm stage
+bun run brand:generate # 从 SVG 主文件同步 Web favicon 和桌面端平台图标
 bun run dev:desktop    # 启动 Electrobun 桌面客户端
 bun run build:desktop  # 构建当前平台的未签名开发安装包
 bun run build:desktop:windows # 在 macOS 上组装 Windows x64 安装包

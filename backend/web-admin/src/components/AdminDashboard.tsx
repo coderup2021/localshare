@@ -27,13 +27,16 @@ export function AdminDashboard() {
     <>
       <Layout className="admin-layout">
         <Header className="admin-header">
-          <div>
-            <Typography.Text strong style={{ display: 'block', fontSize: 18 }}>
-              LocalShare Admin
-            </Typography.Text>
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              当前管理员：{admin?.username}
-            </Typography.Text>
+          <div className="admin-brand">
+            <img className="admin-brand-mark" src="/admin/favicon.svg" alt="" aria-hidden="true" />
+            <div>
+              <Typography.Text strong style={{ display: 'block', fontSize: 18 }}>
+                LocalShare Admin
+              </Typography.Text>
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                当前管理员：{admin?.username}
+              </Typography.Text>
+            </div>
           </div>
           <Space size="middle">
             <Tag color={healthState === 'online' ? 'green' : 'default'}>

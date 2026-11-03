@@ -46,6 +46,7 @@ test('user message is visible to another anonymous browser', async ({ browser, p
 
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'LocalShare' })).toBeVisible()
+  await expect(page.locator('header img[src="/favicon.svg"]')).toBeVisible()
   await expect(page.getByRole('heading', { name: '公共频道' })).toBeVisible()
   await expect(page.getByText('本地服务已连接')).toBeVisible()
 
@@ -298,10 +299,12 @@ test('admin logs in through /admin and reaches the API', async ({ page }) => {
 
   await page.goto('/admin/')
   await expect(page.getByRole('heading', { name: '管理员登录' })).toBeVisible()
+  await expect(page.locator('.login-mark')).toHaveAttribute('src', '/admin/favicon.svg')
   await page.getByLabel('密码').fill('12345678')
   await page.getByRole('button', { name: /登\s*录/ }).click()
 
   await expect(page.getByRole('heading', { name: '工程概览' })).toBeVisible()
+  await expect(page.locator('.admin-brand-mark')).toHaveAttribute('src', '/admin/favicon.svg')
   await expect(page.getByText('服务在线')).toBeVisible()
   await expect(page.getByText('管理员账户')).toBeVisible()
   await expect(page.getByText(displayedApiPort, { exact: true })).toBeVisible()

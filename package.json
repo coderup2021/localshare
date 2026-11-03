@@ -27,6 +27,7 @@
     "install:local": "bun run scripts/install-local.ts",
     "verify:local": "bun run scripts/verify-local-install.ts",
     "publish:npm": "bun run scripts/publish-npm.ts",
+    "brand:generate": "bun run scripts/generate-brand-assets.ts",
     "dev:desktop": "bun run --cwd app-desktop dev",
     "build:desktop": "bun run --cwd app-desktop build",
     "build:desktop:windows": "bun run scripts/build-desktop-windows.ts",

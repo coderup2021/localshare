@@ -79,9 +79,7 @@ export function App() {
 
       <section className="picker-card" aria-labelledby="picker-title">
         <header className="picker-header">
-          <div className="brand-mark" aria-hidden="true">
-            LS
-          </div>
+          <img className="brand-mark" src="/brand-icon.svg" alt="" aria-hidden="true" />
           <div>
             <p className="eyebrow">LocalShare Desktop</p>
             <h1 id="picker-title">连接局域网服务器</h1>

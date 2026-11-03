@@ -388,7 +388,14 @@ export function App() {
   return (
     <main className="mx-auto flex h-screen w-full max-w-6xl flex-col overflow-hidden px-4 py-5 sm:px-8 sm:py-8">
       <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border pb-5">
-        <div>
+        <div className="flex items-center gap-3">
+          <img
+            src="/favicon.svg"
+            alt=""
+            aria-hidden="true"
+            className="size-10 shrink-0"
+            draggable={false}
+          />
           <h1 className="text-2xl font-semibold tracking-tight">LocalShare</h1>
         </div>
         <div className="flex items-center gap-3">

@@ -387,6 +387,7 @@ CodeGraph 是跨里程碑的强制开发工具：M0 完成仓库根目录初始�
 - Linux x64、Windows x64、macOS x64、macOS arm64 的未签名开发构建和 GitHub Actions 构建矩阵。
 - macOS 本地 Windows 交叉组装命令 `bun run build:desktop:windows`：复用官方 Electrobun 2.0.5 Windows x64 runtime、Bun 1.4.4 Windows x64 和当前应用 bundle，生成 portable ZIP、Setup ZIP、单文件安装器及更新包；无需签名。
 - Windows canary 安装归档的应用目录必须使用 Electrobun 推导的 `LocalShareDesktop-canary/`，否则安装器解压后找不到目标目录并显示通用安装失败。
+- 品牌图标以 `assets/brand/localshare-icon.svg` 为唯一矢量源，生成 user-web/admin-web favicon、Desktop 页面图标、macOS iconset、Windows 多尺寸 ICO 和 Linux PNG；资源同步命令为 `bun run brand:generate`。
 
 ### 10.2 验收
 

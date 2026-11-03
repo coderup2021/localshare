@@ -102,6 +102,9 @@ try {
   const macMainBundle = findFirst(macBundleRoot, (path) => path.endsWith('/app/bun/index.js'))
   if (!macMainBundle) fail('Could not locate the built app resources in the macOS archive')
   const macResourcesApp = dirname(dirname(macMainBundle))
+  if (!existsSync(join(macResourcesApp, 'views', 'mainview', 'brand-icon.svg'))) {
+    fail('The desktop view archive is missing views/mainview/brand-icon.svg')
+  }
 
   const cachedLauncher = join(runtimeCacheRoot, 'bin', 'launcher.exe')
   if (!existsSync(cachedLauncher) || !existsSync(join(runtimeCacheRoot, 'installer.exe'))) {
@@ -162,19 +165,7 @@ try {
   cpSync(join(runtimeCacheRoot, 'uninstall'), join(windowsResources, 'uninstall'))
   cpSync(macResourcesApp, join(windowsResources, 'app'), { recursive: true })
 
-  const iconPng = join(temporaryRoot, 'LocalShareDesktop.png')
-  const iconIco = join(temporaryRoot, 'LocalShareDesktop.ico')
-  run([
-    'sips',
-    '-s',
-    'format',
-    'png',
-    join(root, 'backend', 'web-user', 'public', 'favicon.svg'),
-    '--out',
-    iconPng,
-  ])
-  run(['sips', '-s', 'format', 'ico', iconPng, '--out', iconIco])
-  cpSync(iconIco, join(windowsResources, 'AppIcon.ico'))
+  cpSync(join(desktopRoot, 'assets', 'icon.ico'), join(windowsResources, 'AppIcon.ico'))
 
   writeMetadata(join(windowsResources, 'version.json'), {
     version: appVersion,

@@ -14,16 +14,20 @@ export default {
     copy: {
       'dist/index.html': 'views/mainview/index.html',
       'dist/assets': 'views/mainview/assets',
+      'dist/brand-icon.svg': 'views/mainview/brand-icon.svg',
     },
     watchIgnore: ['dist/**'],
     mac: {
       bundleCEF: false,
+      icons: 'assets/icon.iconset',
     },
     linux: {
       bundleCEF: false,
+      icon: 'assets/icon.png',
     },
     win: {
       bundleCEF: false,
+      icon: 'assets/icon.ico',
     },
   },
 } satisfies ElectrobunConfig
