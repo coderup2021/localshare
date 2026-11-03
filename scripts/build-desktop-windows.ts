@@ -13,17 +13,20 @@ import { basename, dirname, join, relative } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
+import { desktopBundleFolderName } from './desktop-package-naming'
+
 const root = fileURLToPath(new URL('..', import.meta.url))
 const desktopRoot = join(root, 'app-desktop')
 const buildRoot = join(desktopRoot, 'build')
 const artifactsRoot = join(desktopRoot, 'releases', 'windows-x64')
 const appFolderName = 'LocalShareDesktop'
-const stagingRoot = join(buildRoot, appFolderName)
 const runtimeCacheRoot = join(desktopRoot, '.cache', 'electrobun-2.0.5-win-x64')
 const appName = 'LocalShare Desktop'
 const appIdentifier = 'dev.localshare.desktop'
 const appVersion = '0.1.0'
 const channel = 'canary'
+const bundleFolderName = desktopBundleFolderName(appName, channel)
+const stagingRoot = join(buildRoot, bundleFolderName)
 const installRootName = 'canary'
 const releaseHash = 'winx64localsharecanary'
 const hostPlatform = process.platform === 'darwin' ? 'macos' : process.platform
@@ -178,7 +181,7 @@ try {
     hash: releaseHash,
     channel,
     baseUrl: '',
-    name: appFolderName,
+    name: bundleFolderName,
     displayName: appName,
     identifier: appIdentifier,
   })
@@ -198,11 +201,11 @@ try {
     `win-x64-${appFolderName}-${appVersion}-portable.zip`,
   )
   rmSync(portableArtifact, { force: true })
-  run(['zip', '-qry', portableArtifact, appFolderName], buildRoot)
+  run(['zip', '-qry', portableArtifact, bundleFolderName], buildRoot)
 
   const appTar = join(temporaryRoot, 'LocalShareDesktop.tar')
   const installArchive = join(temporaryRoot, 'LocalShareDesktop-Setup.tar.zst')
-  run(['tar', '-cf', appTar, appFolderName], buildRoot)
+  run(['tar', '-cf', appTar, bundleFolderName], buildRoot)
   run(['zstd', '-q', '-f', '-o', installArchive, appTar])
 
   const referenceInstaller = readFileSync(join(runtimeCacheRoot, 'installer.exe'))
@@ -270,7 +273,7 @@ try {
       '',
       'Portable package:',
       `  ${basename(portableArtifact)}`,
-      `  Extract it and run ${appFolderName}\\bin\\launcher.exe.`,
+      `  Extract it and run ${bundleFolderName}\\bin\\launcher.exe.`,
       '',
       'Requirements: Windows 10/11 x64 and Microsoft Edge WebView2 Runtime.',
       '',

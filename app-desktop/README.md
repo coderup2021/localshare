@@ -33,7 +33,8 @@ bun run build:desktop:windows
 This produces portable, Setup ZIP, standalone Setup EXE and update artifacts in
 `releases/windows-x64/`. The official Electrobun Windows runtime is cached under
 `app-desktop/.cache/` after the first assembly. Windows execution still needs
-to be verified on a Windows host.
+to be verified on a Windows host. The canary portable archive extracts to
+`LocalShareDesktop-canary/`; run `LocalShareDesktop-canary/bin/launcher.exe`.
 
 The default build uses the canary channel and is intentionally unsigned. Use a
 supported host for each target:

@@ -171,6 +171,9 @@ x64 和当前应用 bundle 组装；不需要代码签名。当前构建机不�
 程序，因此运行时仍需在 Windows 上验收。参考 runtime 路径可通过
 `LOCALSHARE_WINDOWS_REFERENCE_ROOT` 覆盖；首次组装后 runtime 会缓存到
 `app-desktop/.cache/electrobun-2.0.5-win-x64/`，后续构建不再依赖外部项目。
+canary 便携包解压后的应用目录为 `LocalShareDesktop-canary/`，与 Electrobun
+安装器推导的目录名一致；启动文件是
+`LocalShareDesktop-canary/bin/launcher.exe`。
 
 Electrobun 的完整构建需要对应平台的图形运行库。Linux 构建和原生冒烟要求 glibc 2.38 或更高；仓库 CI 矩阵使用 Ubuntu 24.04、Windows 2022 x64、macOS 15 Intel 和 macOS 15 arm64。
 
