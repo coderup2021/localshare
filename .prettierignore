@@ -8,3 +8,4 @@ backend/server/drizzle
 .hutch
 app-desktop/build
 app-desktop/artifacts
+scripts/vendor/resedit.mjs

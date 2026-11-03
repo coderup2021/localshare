@@ -19,6 +19,7 @@ export default tseslint.config(
       'app-desktop/build/**',
       'app-desktop/artifacts/**',
       'backend/server/drizzle/**',
+      'scripts/vendor/resedit.mjs',
     ],
   },
   js.configs.recommended,

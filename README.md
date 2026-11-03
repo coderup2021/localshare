@@ -182,6 +182,8 @@ x64 和当前应用 bundle 组装；不需要代码签名。当前构建机不�
 canary 便携包解压后的应用目录为 `LocalShareDesktop-canary/`，与 Electrobun
 安装器推导的目录名一致；启动文件是
 `LocalShareDesktop-canary/bin/launcher.exe`。
+Windows 打包会同时把品牌 ICO 嵌入 `launcher.exe` 和安装器本体；仅替换
+`Resources/AppIcon.ico` 不足以改变 Windows 快捷方式和任务栏使用的程序图标。
 
 Electrobun 的完整构建需要对应平台的图形运行库。Linux 构建和原生冒烟要求 glibc 2.38 或更高；仓库 CI 矩阵使用 Ubuntu 24.04、Windows 2022 x64、macOS 15 Intel 和 macOS 15 arm64。
 

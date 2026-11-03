@@ -14,11 +14,13 @@ import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
 import { desktopBundleFolderName } from './desktop-package-naming'
+import { patchWindowsExecutableIcon } from './patch-windows-exe-icon'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const desktopRoot = join(root, 'app-desktop')
 const buildRoot = join(desktopRoot, 'build')
 const artifactsRoot = join(desktopRoot, 'releases', 'windows-x64')
+const windowsIconPath = join(desktopRoot, 'assets', 'icon.ico')
 const appFolderName = 'LocalShareDesktop'
 const runtimeCacheRoot = join(desktopRoot, '.cache', 'electrobun-2.0.5-win-x64')
 const appName = 'LocalShare Desktop'
@@ -165,7 +167,8 @@ try {
   cpSync(join(runtimeCacheRoot, 'uninstall'), join(windowsResources, 'uninstall'))
   cpSync(macResourcesApp, join(windowsResources, 'app'), { recursive: true })
 
-  cpSync(join(desktopRoot, 'assets', 'icon.ico'), join(windowsResources, 'AppIcon.ico'))
+  cpSync(windowsIconPath, join(windowsResources, 'AppIcon.ico'))
+  patchWindowsExecutableIcon(join(windowsBin, 'launcher.exe'), windowsIconPath)
 
   writeMetadata(join(windowsResources, 'version.json'), {
     version: appVersion,
@@ -199,10 +202,15 @@ try {
   run(['tar', '-cf', appTar, bundleFolderName], buildRoot)
   run(['zstd', '-q', '-f', '-o', installArchive, appTar])
 
-  const referenceInstaller = readFileSync(join(runtimeCacheRoot, 'installer.exe'))
-
   const installerName = `${appFolderName}-${appVersion}-Setup.exe`
   const setupArtifactBase = `${appFolderName}-${appVersion}-Setup`
+  const patchedInstallerPath = join(temporaryRoot, installerName)
+  patchWindowsExecutableIcon(
+    join(runtimeCacheRoot, 'installer.exe'),
+    windowsIconPath,
+    patchedInstallerPath,
+  )
+  const referenceInstaller = readFileSync(patchedInstallerPath)
   mkdirSync(join(setupRoot, '.installer'), { recursive: true })
   writeFileSync(join(setupRoot, installerName), referenceInstaller)
   const setupMetadata = {
