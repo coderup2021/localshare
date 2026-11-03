@@ -13,7 +13,7 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs'
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { networkInterfaces, homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -22,10 +22,13 @@ import { fileURLToPath } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
 import { createInterface } from 'node:readline/promises'
 
+import { findPlatformTarget, supportedPlatformLabels } from './platforms.mjs'
+
 const API_PORT = 8887
 const WEB_PORT = 8888
 const DISCOVERY_PORT = 49777
-const ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
+const binDir = dirname(fileURLToPath(import.meta.url))
+const ROOT = dirname(binDir)
 const packageJson = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))
 const require = createRequire(import.meta.url)
 const configDir = process.env.LOCALSHARE_CONFIG_DIR ?? join(homedir(), '.localshare')
@@ -112,21 +115,50 @@ function processAlive(pid) {
   try {
     process.kill(pid, 0)
     return true
-  } catch {
-    return false
+  } catch (error) {
+    return error?.code === 'EPERM'
   }
+}
+
+function readProcessCommand(pid) {
+  if (process.platform === 'linux') {
+    try {
+      return readFileSync(`/proc/${pid}/cmdline`, 'utf8').replaceAll('\0', ' ')
+    } catch {
+      return null
+    }
+  }
+
+  const command =
+    process.platform === 'win32'
+      ? ['tasklist', ['/FI', `PID eq ${pid}`, '/FO', 'CSV', '/NH']]
+      : process.platform === 'darwin'
+        ? ['ps', ['-p', String(pid), '-o', 'command=']]
+        : null
+  if (!command) return null
+
+  const result = spawnSync(command[0], command[1], {
+    encoding: 'utf8',
+    windowsHide: true,
+  })
+  return result.status === 0 ? result.stdout : null
 }
 
 function processMatches(pid) {
   if (!processAlive(pid)) return false
-  if (process.platform !== 'linux') return true
+  const command = readProcessCommand(pid)
+  return command?.toLowerCase().includes('localshare-server') ?? false
+}
 
-  try {
-    const command = readFileSync(`/proc/${pid}/cmdline`, 'utf8').replaceAll('\0', ' ')
-    return command.includes('localshare-server')
-  } catch {
-    return false
+function terminateProcess(pid, force = false) {
+  if (process.platform === 'win32' && force) {
+    spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], {
+      stdio: 'ignore',
+      windowsHide: true,
+    })
+    return
   }
+  process.kill(pid, force ? 'SIGKILL' : 'SIGTERM')
 }
 
 function readCurrentInstance() {
@@ -173,19 +205,20 @@ async function checkPort(port, ip) {
 }
 
 function binaryPath() {
-  const platformPackage =
-    process.platform === 'linux' && process.arch === 'x64' ? 'localshare-server-linux-x64' : null
-  if (!platformPackage) {
-    fail(`Unsupported platform: ${process.platform}-${process.arch}`)
+  const target = findPlatformTarget(process.platform, process.arch)
+  if (!target) {
+    fail(
+      `Unsupported platform: ${process.platform}-${process.arch}. Supported: ${supportedPlatformLabels()}`,
+    )
   }
 
   let packageJsonPath
   try {
-    packageJsonPath = require.resolve(`${platformPackage}/package.json`)
+    packageJsonPath = require.resolve(`${target.packageName}/package.json`)
   } catch {
-    fail(`Platform package ${platformPackage} is not installed`)
+    fail(`Platform package ${target.packageName} is not installed`)
   }
-  const path = join(dirname(packageJsonPath), 'bin', 'localshare-server')
+  const path = join(dirname(packageJsonPath), 'bin', target.binaryName)
   if (!existsSync(path)) fail(`LocalShare server binary is missing: ${path}`)
   return path
 }
@@ -265,6 +298,7 @@ async function start(dataDirValue, ip, options = {}) {
   try {
     child = spawn(binaryPath(), [], {
       detached: true,
+      windowsHide: true,
       env: {
         ...process.env,
         API_HOST: ip,
@@ -304,7 +338,7 @@ async function start(dataDirValue, ip, options = {}) {
     await waitForHealth(instance, child, paths.log)
   } catch (error) {
     try {
-      process.kill(instance.pid, 'SIGTERM')
+      terminateProcess(instance.pid)
     } catch {
       // Process already exited.
     }
@@ -343,9 +377,9 @@ async function stop(options = {}) {
     fail(`PID ${instance.pid} no longer belongs to LocalShare; refusing to stop it.`)
   }
 
-  process.kill(instance.pid, 'SIGTERM')
+  terminateProcess(instance.pid)
   if (!(await waitForExit(instance.pid, 10_000))) {
-    process.kill(instance.pid, 'SIGKILL')
+    terminateProcess(instance.pid, true)
     await waitForExit(instance.pid, 3_000)
   }
   cleanStaleRuntime(paths)

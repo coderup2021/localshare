@@ -1,0 +1,42 @@
+[
+  {
+    "platform": "linux",
+    "arch": "x64",
+    "label": "Linux x64",
+    "packageName": "localshare-server-linux-x64",
+    "bunTarget": "bun-linux-x64",
+    "binaryName": "localshare-server"
+  },
+  {
+    "platform": "linux",
+    "arch": "arm64",
+    "label": "Linux arm64",
+    "packageName": "localshare-server-linux-arm64",
+    "bunTarget": "bun-linux-arm64",
+    "binaryName": "localshare-server"
+  },
+  {
+    "platform": "win32",
+    "arch": "x64",
+    "label": "Windows x64",
+    "packageName": "localshare-server-win32-x64",
+    "bunTarget": "bun-windows-x64",
+    "binaryName": "localshare-server.exe"
+  },
+  {
+    "platform": "darwin",
+    "arch": "x64",
+    "label": "macOS x64",
+    "packageName": "localshare-server-darwin-x64",
+    "bunTarget": "bun-darwin-x64",
+    "binaryName": "localshare-server"
+  },
+  {
+    "platform": "darwin",
+    "arch": "arm64",
+    "label": "macOS arm64",
+    "packageName": "localshare-server-darwin-arm64",
+    "bunTarget": "bun-darwin-arm64",
+    "binaryName": "localshare-server"
+  }
+]

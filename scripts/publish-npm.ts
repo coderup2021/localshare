@@ -9,7 +9,10 @@ const publishEnvPath = join(root, '.env.publish')
 
 type ReleaseManifest = {
   version: string
-  platform: string
+  platforms: Array<{
+    name: string
+    artifact: string
+  }>
   artifacts: string[]
 }
 
@@ -87,13 +90,14 @@ function main() {
   run(['bun', 'run', 'pack:server'])
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as ReleaseManifest
   const releaseRoot = join(root, '.release', 'npm')
-  const platformDirectory = join(releaseRoot, manifest.platform)
   const mainDirectory = join(releaseRoot, 'localshare-server')
 
-  stagePackage(manifest.platform, platformDirectory, env)
+  for (const platform of manifest.platforms) {
+    stagePackage(platform.name, join(releaseRoot, platform.name), env)
+  }
   stagePackage('localshare-server', mainDirectory, env)
 
-  printStageList(manifest.platform, env)
+  for (const platform of manifest.platforms) printStageList(platform.name, env)
   printStageList('localshare-server', env)
 
   console.log('')

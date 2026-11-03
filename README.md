@@ -40,8 +40,13 @@ Web 入口使用 `7777`，避开 Chromium 对 `6665–6669` 的不安全端口�
 
 ## 生产安装与运行
 
-发布候选包为 `localshare-server`，平台运行时通过
-`localshare-server-linux-x64` 安装：
+发布候选主包为 `localshare-server`，npm 会按当前系统自动安装匹配的平台运行时：
+
+- Linux x64 / arm64
+- Windows x64
+- macOS x64 / arm64（Apple Silicon）
+
+终端用户只需安装 Node.js/npm，不需要另装 Bun：
 
 ```bash
 npm install -g localshare-server
@@ -115,7 +120,7 @@ NPM_ACCESS_TOKEN=<npm granular access token>
 `.env.publish` 已被 Git 忽略。token 只在子进程中通过环境变量传递，不写入
 tarball、日志或实例配置。
 
-当前发布物支持 Linux x64；不支持平台会明确失败。安装阶段不会启动服务或创建业务数据。
+当前发布物覆盖 Linux x64/arm64、Windows x64、macOS x64/arm64；不支持的系统或架构会明确失败。安装阶段不会启动服务或创建业务数据。
 
 ## 桌面端
 

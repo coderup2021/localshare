@@ -10,7 +10,7 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { basename, join } from 'node:path'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
@@ -35,45 +35,82 @@ function shellQuote(value: string) {
 run(['bun', 'run', 'pack:server'])
 
 const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
-  artifacts: string[]
+  mainArtifact: string
+  platforms: Array<{ name: string; artifact: string }>
+}
+const platformTargets = JSON.parse(
+  readFileSync(join(root, 'backend', 'server', 'npm', 'bin', 'platforms.json'), 'utf8'),
+) as Array<{ platform: string; arch: string; packageName: string }>
+const currentPlatform = platformTargets.find(
+  (target) => target.platform === process.platform && target.arch === process.arch,
+)
+if (!currentPlatform) {
+  throw new Error(`Unsupported platform for local install: ${process.platform}-${process.arch}`)
+}
+const platformPackage = manifest.platforms.find(
+  (platform) => platform.name === currentPlatform.packageName,
+)
+if (!platformPackage) {
+  throw new Error(`Missing local artifact for ${currentPlatform.packageName}`)
 }
 const installRoot = mkdtempSync(join(tmpdir(), 'localshare-local-install-'))
 const prefix = join(installRoot, 'prefix')
 const configDir = join(installRoot, 'config')
 const wrapperDir = join(installRoot, 'bin')
-const wrapperPath = join(wrapperDir, 'localshare')
-const installedBinary = join(prefix, 'bin', 'localshare')
-const artifacts = manifest.artifacts.map((artifact) =>
-  join(root, '.release', 'npm', 'artifacts', basename(artifact)),
+const isWindows = process.platform === 'win32'
+const wrapperName = isWindows ? 'localshare.cmd' : 'localshare'
+const wrapperPath = join(wrapperDir, wrapperName)
+const artifacts = [platformPackage.artifact, manifest.mainArtifact].map((artifact) =>
+  join(root, '.release', 'npm', 'artifacts', artifact),
 )
 
 run(['npm', 'install', '--global', '--prefix', prefix, '--no-audit', '--no-fund', ...artifacts])
 
 mkdirSync(wrapperDir, { recursive: true })
-writeFileSync(
-  wrapperPath,
-  [
-    '#!/bin/sh',
-    `export LOCALSHARE_CONFIG_DIR="\${LOCALSHARE_CONFIG_DIR:-${configDir}}"`,
-    `exec ${shellQuote(installedBinary)} "$@"`,
-    '',
-  ].join('\n'),
-)
-chmodSync(wrapperPath, 0o755)
+const installedCommand = [
+  join(prefix, isWindows ? 'localshare.cmd' : 'bin/localshare'),
+  join(prefix, 'bin', wrapperName),
+].find(existsSync)
+if (!installedCommand) {
+  throw new Error(`npm did not create the localshare command under ${prefix}`)
+}
+
+if (isWindows) {
+  writeFileSync(
+    wrapperPath,
+    [
+      '@echo off',
+      `if not defined LOCALSHARE_CONFIG_DIR set "LOCALSHARE_CONFIG_DIR=${configDir}"`,
+      `call "${installedCommand}" %*`,
+      '',
+    ].join('\r\n'),
+  )
+} else {
+  writeFileSync(
+    wrapperPath,
+    [
+      '#!/bin/sh',
+      `export LOCALSHARE_CONFIG_DIR="\${LOCALSHARE_CONFIG_DIR:-${configDir}}"`,
+      `exec ${shellQuote(installedCommand)} "$@"`,
+      '',
+    ].join('\n'),
+  )
+  chmodSync(wrapperPath, 0o755)
+}
 
 if (existsSync(currentLink)) {
   const currentStat = lstatSync(currentLink)
   if (!currentStat.isSymbolicLink() && !currentStat.isFile()) {
     throw new Error(`Cannot replace non-file path: ${currentLink}`)
   }
-  rmSync(currentLink, { force: true })
+  rmSync(currentLink, { force: true, recursive: true })
 }
-symlinkSync(installRoot, currentLink, 'dir')
+symlinkSync(installRoot, currentLink, isWindows ? 'junction' : 'dir')
 
 console.log('')
 console.log('Temporary LocalShare install is ready.')
 console.log(`Install root: ${installRoot}`)
 console.log(`Command:      ${wrapperPath}`)
-console.log(`Stable path:  ${join(currentLink, 'bin', 'localshare')}`)
+console.log(`Stable path:  ${join(currentLink, 'bin', wrapperName)}`)
 console.log('')
-console.log(`Try: ${join(currentLink, 'bin', 'localshare')} start`)
+console.log(`Try: ${join(currentLink, 'bin', wrapperName)} start`)

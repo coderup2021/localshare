@@ -363,7 +363,9 @@ localshare --version
 
 开发仓库中的 TypeScript 源码、测试、`.env`、数据库、上传文件和日志不得打进发布包。
 
-发布方案采用 `bun build --compile` 生成各平台独立二进制，并通过 npm 平台 `optionalDependencies` 分发。上层 npm 包提供 Node 兼容的 `localshare` 启动器，根据操作系统和 CPU 架构选择对应二进制；用户安装 npm 包后不需要额外安装 Bun。暂时不支持的平台必须在安装或首次执行时明确报错，不能静默安装后启动失败。
+发布方案采用 `bun build --compile` 生成各平台独立二进制，并通过 npm 平台 `optionalDependencies` 分发。当前矩阵为 Linux x64/arm64、Windows x64、macOS x64/arm64。上层 npm 包提供 Node 兼容的 `localshare` 启动器，根据 `process.platform` 和 `process.arch` 选择包及二进制名称；Windows 平台包使用 `.exe`。用户安装 npm 包后不需要额外安装 Bun。暂时不支持的平台必须在安装或首次执行时明确报错，不能静默安装后启动失败。
+
+平台包通过 Bun `--target` 从 Linux 构建机交叉编译；发布前至少检查 ELF、PE32+ 和 Mach-O 架构。Linux/macOS 使用 `SIGTERM` 后 `SIGKILL` 停止服务，Windows 使用 `process.kill` 并在超时后以 `taskkill /T /F` 清理进程树。进程归属判断分别使用 `/proc`、`ps` 和 `tasklist`，不得仅凭 PID 存活就停止进程。
 
 ### 14.2 数据目录
 

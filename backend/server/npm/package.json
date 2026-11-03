@@ -17,6 +17,10 @@
     "node": ">=18"
   },
   "optionalDependencies": {
-    "localshare-server-linux-x64": "0.2.0"
+    "localshare-server-linux-x64": "0.2.0",
+    "localshare-server-linux-arm64": "0.2.0",
+    "localshare-server-win32-x64": "0.2.0",
+    "localshare-server-darwin-x64": "0.2.0",
+    "localshare-server-darwin-arm64": "0.2.0"
   }
 }

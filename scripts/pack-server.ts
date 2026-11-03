@@ -2,18 +2,26 @@ import { chmodSync, cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } fro
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+type PlatformTarget = {
+  platform: string
+  arch: string
+  label: string
+  packageName: string
+  bunTarget: string
+  binaryName: string
+}
+
 const root = fileURLToPath(new URL('..', import.meta.url))
 const releaseRoot = join(root, '.release', 'npm')
 const artifactsDir = join(releaseRoot, 'artifacts')
 const mainDir = join(releaseRoot, 'localshare-server')
-const platformName = 'localshare-server-linux-x64'
-const platformDir = join(releaseRoot, platformName)
-const binaryName = 'localshare-server'
-const binaryPath = join(platformDir, 'bin', binaryName)
 const serverPackage = JSON.parse(
   readFileSync(join(root, 'backend', 'server', 'package.json'), 'utf8'),
-)
+) as { version: string }
 const version = serverPackage.version
+const platformTargets = JSON.parse(
+  readFileSync(join(root, 'backend', 'server', 'npm', 'bin', 'platforms.json'), 'utf8'),
+) as PlatformTarget[]
 
 function run(command: string[], cwd = root) {
   const result = Bun.spawnSync(command, {
@@ -44,24 +52,57 @@ mkdirSync(artifactsDir, { recursive: true })
 run(['bun', 'run', 'build'], join(root, 'backend', 'web-user'))
 run(['bun', 'run', 'build'], join(root, 'backend', 'web-admin'))
 
-mkdirSync(dirname(binaryPath), { recursive: true })
-run([
-  'bun',
-  'build',
-  join(root, 'backend', 'server', 'src', 'index.ts'),
-  '--compile',
-  '--minify',
-  `--outfile=${binaryPath}`,
-])
-chmodSync(binaryPath, 0o755)
+const platformPacks: string[] = []
+for (const target of platformTargets) {
+  const platformDir = join(releaseRoot, target.packageName)
+  const binaryPath = join(platformDir, 'bin', target.binaryName)
+  mkdirSync(dirname(binaryPath), { recursive: true })
+
+  const buildArgs = [
+    'bun',
+    'build',
+    join(root, 'backend', 'server', 'src', 'index.ts'),
+    '--compile',
+    '--minify',
+    `--target=${target.bunTarget}`,
+    `--outfile=${binaryPath}`,
+  ]
+  if (target.platform === 'win32') {
+    buildArgs.push('--windows-hide-console')
+  }
+  run(buildArgs)
+  if (target.platform !== 'win32') chmodSync(binaryPath, 0o755)
+
+  writeFileSync(
+    join(platformDir, 'package.json'),
+    `${JSON.stringify(
+      {
+        name: target.packageName,
+        version,
+        description: `LocalShare ${target.label} server runtime`,
+        license: '0BSD',
+        os: [target.platform],
+        cpu: [target.arch],
+        files: [`bin/${target.binaryName}`, 'LICENSE'],
+      },
+      null,
+      2,
+    )}\n`,
+  )
+  cpSync(join(root, 'LICENSE'), join(platformDir, 'LICENSE'))
+
+  platformPacks.push(
+    runCapture(['npm', 'pack', '--pack-destination', artifactsDir], platformDir).trim(),
+  )
+}
 
 const mainPackage = JSON.parse(
   readFileSync(join(root, 'backend', 'server', 'npm', 'package.json'), 'utf8'),
-)
+) as { version: string; optionalDependencies?: Record<string, string> }
 mainPackage.version = version
-mainPackage.optionalDependencies = {
-  [platformName]: version,
-}
+mainPackage.optionalDependencies = Object.fromEntries(
+  platformTargets.map((target) => [target.packageName, version]),
+)
 mkdirSync(join(mainDir, 'bin'), { recursive: true })
 cpSync(join(root, 'backend', 'server', 'npm', 'bin'), join(mainDir, 'bin'), {
   recursive: true,
@@ -82,42 +123,26 @@ cpSync(join(root, 'backend', 'server', 'drizzle'), join(mainDir, 'resources', 'd
   recursive: true,
 })
 
-writeFileSync(
-  join(platformDir, 'package.json'),
-  `${JSON.stringify(
-    {
-      name: platformName,
-      version,
-      description: 'LocalShare Linux x64 server runtime',
-      license: '0BSD',
-      os: ['linux'],
-      cpu: ['x64'],
-      files: ['bin/localshare-server', 'LICENSE'],
-    },
-    null,
-    2,
-  )}\n`,
-)
-cpSync(join(root, 'LICENSE'), join(platformDir, 'LICENSE'))
-
-const platformPack = runCapture(
-  ['npm', 'pack', '--pack-destination', artifactsDir],
-  platformDir,
-).trim()
 const mainPack = runCapture(['npm', 'pack', '--pack-destination', artifactsDir], mainDir).trim()
+const artifacts = [...platformPacks, mainPack]
 
 writeFileSync(
   join(releaseRoot, 'manifest.json'),
   `${JSON.stringify(
     {
       version,
-      platform: platformName,
-      artifacts: [platformPack, mainPack],
+      mainArtifact: mainPack,
+      platforms: platformTargets.map((target, index) => ({
+        name: target.packageName,
+        artifact: platformPacks[index],
+      })),
+      artifacts,
     },
     null,
     2,
   )}\n`,
 )
 
-console.log(`Created ${join(artifactsDir, platformPack)}`)
-console.log(`Created ${join(artifactsDir, mainPack)}`)
+for (const artifact of artifacts) {
+  console.log(`Created ${join(artifactsDir, artifact)}`)
+}

@@ -11,6 +11,10 @@ localshare restart
 localshare stop
 ```
 
+The matching runtime is installed automatically on Linux x64/arm64, Windows
+x64, macOS x64 and macOS arm64. Global users need Node.js/npm but do not need a
+separate Bun installation.
+
 The first `start` asks for:
 
 - Data directory, default: `~/.localshare`
