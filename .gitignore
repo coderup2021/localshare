@@ -1,4 +1,5 @@
 node_modules/
+**/.DS_Store
 dist/
 coverage/
 playwright-report/
@@ -8,9 +9,11 @@ test-results/
 .desktop-e2e-data/
 .release/
 **/.hutch/
+app-desktop/.cache/
 **/.cottontail-tmp/
 app-desktop/build/
 app-desktop/artifacts/
+app-desktop/releases/
 uploads/
 logs/
 .env

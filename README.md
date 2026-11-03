@@ -152,6 +152,26 @@ bun run dev:desktop
 bun run build:desktop
 ```
 
+在 macOS 上交叉组装 Windows x64 便携包和安装器：
+
+```bash
+bun run build:desktop:windows
+```
+
+产物位于 `app-desktop/releases/windows-x64/`：
+
+- `win-x64-LocalShareDesktop-0.1.0-portable.zip`
+- `LocalShareDesktop-0.1.0-Setup.zip`
+- `LocalShareDesktop-0.1.0-Setup-standalone.exe`
+- `canary-win-x64-LocalShareDesktop-0.1.0.tar.zst`
+- `canary-win-x64-update.json`
+
+Windows 包使用 Electrobun 2.0.5 官方 Windows x64 runtime、Bun 1.4.4 Windows
+x64 和当前应用 bundle 组装；不需要代码签名。当前构建机不能执行 Windows
+程序，因此运行时仍需在 Windows 上验收。参考 runtime 路径可通过
+`LOCALSHARE_WINDOWS_REFERENCE_ROOT` 覆盖；首次组装后 runtime 会缓存到
+`app-desktop/.cache/electrobun-2.0.5-win-x64/`，后续构建不再依赖外部项目。
+
 Electrobun 的完整构建需要对应平台的图形运行库。Linux 构建和原生冒烟要求 glibc 2.38 或更高；仓库 CI 矩阵使用 Ubuntu 24.04、Windows 2022 x64、macOS 15 Intel 和 macOS 15 arm64。
 
 ## 许可证

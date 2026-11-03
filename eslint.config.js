@@ -13,6 +13,7 @@ export default tseslint.config(
       '**/.codegraph/**',
       '**/.hutch/**',
       '**/.cottontail-tmp/**',
+      '**/.cache/**',
       '**/.data/**',
       '**/.release/**',
       'app-desktop/build/**',

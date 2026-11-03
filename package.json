@@ -29,6 +29,7 @@
     "publish:npm": "bun run scripts/publish-npm.ts",
     "dev:desktop": "bun run --cwd app-desktop dev",
     "build:desktop": "bun run --cwd app-desktop build",
+    "build:desktop:windows": "bun run scripts/build-desktop-windows.ts",
     "test:desktop": "bun run --cwd app-desktop test",
     "test:desktop:e2e": "bun run scripts/test-desktop-e2e.ts",
     "graph:index": "codegraph index .",

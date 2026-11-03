@@ -385,6 +385,7 @@ CodeGraph 是跨里程碑的强制开发工具：M0 完成仓库根目录初始�
 - 服务端新增 IPv4 UDP `49777` 发现监听，使用“广播查询 + 单播响应”，共享 Zod 协议和稳定 `serverId`。
 - 发现客户端支持回环、各网卡定向广播、`serverId` 去重、10 秒过期和私有 IPv4 来源约束。
 - Linux x64、Windows x64、macOS x64、macOS arm64 的未签名开发构建和 GitHub Actions 构建矩阵。
+- macOS 本地 Windows 交叉组装命令 `bun run build:desktop:windows`：复用官方 Electrobun 2.0.5 Windows x64 runtime、Bun 1.4.4 Windows x64 和当前应用 bundle，生成 portable ZIP、Setup ZIP、单文件安装器及更新包；无需签名。
 
 ### 10.2 验收
 

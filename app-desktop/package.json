@@ -10,6 +10,7 @@
     "dev:view": "vite",
     "build:view": "vite build",
     "build": "bun run prepare:electrobun && bun run build:view && bunx electrobun build --env=canary",
+    "build:windows": "bun run ../../scripts/build-desktop-windows.ts",
     "typecheck": "tsc --noEmit",
     "test": "bun test"
   },

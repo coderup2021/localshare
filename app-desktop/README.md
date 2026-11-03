@@ -24,6 +24,17 @@ Cottontail configuration loader requires glibc 2.38 or newer on Linux.
 bun run build:desktop
 ```
 
+On macOS, cross-assemble the Windows x64 package without code signing:
+
+```bash
+bun run build:desktop:windows
+```
+
+This produces portable, Setup ZIP, standalone Setup EXE and update artifacts in
+`releases/windows-x64/`. The official Electrobun Windows runtime is cached under
+`app-desktop/.cache/` after the first assembly. Windows execution still needs
+to be verified on a Windows host.
+
 The default build uses the canary channel and is intentionally unsigned. Use a
 supported host for each target:
 
