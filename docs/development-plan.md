@@ -256,6 +256,7 @@ CodeGraph 是跨里程碑的强制开发工具：M0 完成仓库根目录初始�
 
 - `attachments` 表、消息附件外键、第四个 Drizzle migration。
 - `POST /api/v1/public/uploads` 以原始请求体逐块写盘，限制单文件 100 MB，服务端生成安全存储键并同步计算 SHA-256。
+- 附件存储路径使用基于 `path.relative` 的根目录包含校验，兼容 Windows 反斜杠与 POSIX/macOS 路径，并继续拒绝目录逃逸、同前缀兄弟目录和跨盘符路径。
 - `POST /api/v1/public/messages` 可携带附件 ID，事务内完成消息写入和附件状态切换。
 - `GET /api/v1/public/attachments/:id` 下载已关联附件，支持单段 HTTP Range。
 - 可安全内联的栅格图片和常见视频内联展示；SVG 等潜在主动内容强制作为文件下载。
