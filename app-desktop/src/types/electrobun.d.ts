@@ -10,7 +10,13 @@ declare module 'electrobun' {
       bun: { entrypoint: string }
       copy?: Record<string, string>
       watchIgnore?: string[]
-      mac?: { bundleCEF?: boolean; codesign?: boolean; notarize?: boolean; icons?: string }
+      mac?: {
+        bundleCEF?: boolean
+        codesign?: boolean
+        notarize?: boolean
+        createDmg?: boolean
+        icons?: string
+      }
       linux?: { bundleCEF?: boolean; icon?: string }
       win?: { bundleCEF?: boolean; icon?: string }
       release?: { baseUrl?: string; generatePatch?: boolean }

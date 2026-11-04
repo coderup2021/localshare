@@ -24,6 +24,12 @@ Cottontail configuration loader requires glibc 2.38 or newer on Linux.
 bun run build:desktop
 ```
 
+On macOS, the native build command ad-hoc signs the generated app bundle,
+verifies it with `codesign --verify --deep --strict`, and rebuilds both the DMG
+and update archive from the signed app. No Apple Developer account is required.
+Because the app is not notarized, Gatekeeper may still require the recipient to
+choose “Open Anyway” or remove the quarantine attribute for personal use.
+
 On macOS, cross-assemble the Windows x64 package without code signing:
 
 ```bash

@@ -20,6 +20,7 @@ export default {
     mac: {
       bundleCEF: false,
       icons: 'assets/icon.iconset',
+      createDmg: false,
     },
     linux: {
       bundleCEF: false,

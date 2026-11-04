@@ -389,6 +389,7 @@ CodeGraph 是跨里程碑的强制开发工具：M0 完成仓库根目录初始�
 - Windows canary 安装归档的应用目录必须使用 Electrobun 推导的 `LocalShareDesktop-canary/`，否则安装器解压后找不到目标目录并显示通用安装失败。
 - 品牌图标以 `assets/brand/localshare-icon.svg` 为唯一矢量源，生成 user-web/admin-web favicon、Desktop 页面图标、macOS iconset、Windows 多尺寸 ICO 和 Linux PNG；资源同步命令为 `bun run brand:generate`。
 - Windows 交叉组装必须把品牌 ICO 嵌入 `launcher.exe` 和安装器的 PE 资源；Windows 快捷方式由 `launcher.exe` 提供图标，不能只替换 `Resources/AppIcon.ico`。
+- macOS 本地构建会在 Electrobun 生成 `.app` 后执行 ad-hoc 签名，校验深度签名，并从已签名 App 重新生成 DMG 与 `.app.tar.zst` 更新归档；不需要 Apple Developer 账号，但 Gatekeeper 仍可能要求用户手动确认首次启动。
 
 ### 10.2 验收
 

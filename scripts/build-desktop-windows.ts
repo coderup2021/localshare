@@ -89,9 +89,7 @@ const macBundleRoot = join(temporaryRoot, 'mac-bundle')
 const setupRoot = join(temporaryRoot, 'setup')
 
 try {
-  run(['bun', 'run', 'prepare:electrobun'], desktopRoot)
-  run(['bun', 'run', 'build:view'], desktopRoot)
-  run(['bunx', 'electrobun', 'build', '--env=canary'], desktopRoot)
+  run(['bun', 'run', 'build'], desktopRoot)
 
   const macBuildDir = join(buildRoot, `canary-${hostPlatform}-${process.arch}`)
   const macArchive = findFirst(macBuildDir, (path) => path.endsWith('.tar.zst'))

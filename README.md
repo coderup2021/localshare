@@ -152,6 +152,15 @@ bun run dev:desktop
 bun run build:desktop
 ```
 
+macOS 构建会在生成 `.app` 后执行 ad-hoc 签名，重新生成 DMG 和应用更新归档，
+并使用 `codesign --verify --deep --strict` 校验。该签名不需要 Apple Developer
+账号，但没有经过 Apple 公证；从另一台 Mac 下载后，首次启动仍可能需要在
+“系统设置 > 隐私与安全性”中选择“仍要打开”，或手动移除隔离属性：
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/LocalShare Desktop-canary.app"
+```
+
 Logo 的 SVG 主文件位于 `assets/brand/localshare-icon.svg`。修改主文件后，在
 macOS 上运行以下命令，同步 Web favicon、Desktop 页面图标及 macOS/Windows/Linux
 安装包图标：
